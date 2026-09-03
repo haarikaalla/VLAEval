@@ -20,7 +20,7 @@ spec:
         runAsUser: 1000
       containers:
         - name: frontend
-          image: ghcr.io/your-org/vla-eval-frontend:latest
+          image: ghcr.io/haarikaalla/vla-eval-frontend:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

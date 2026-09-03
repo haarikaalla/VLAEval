@@ -14,9 +14,9 @@ configMapGenerator:
       - APP_ENV=staging
       - API_CORS_ORIGINS=https://staging.vla-eval.example.com
 images:
-  - name: ghcr.io/your-org/vla-eval-api
+  - name: ghcr.io/haarikaalla/vla-eval-api
     newTag: staging
-  - name: ghcr.io/your-org/vla-eval-worker
+  - name: ghcr.io/haarikaalla/vla-eval-worker
     newTag: staging
-  - name: ghcr.io/your-org/vla-eval-frontend
+  - name: ghcr.io/haarikaalla/vla-eval-frontend
     newTag: staging

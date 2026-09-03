@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip && \
-    pip install mlflow>=2.13.0 psycopg2-binary boto3
+    pip install "mlflow>=2.13.0" psycopg2-binary boto3
 
 RUN groupadd --gid 1000 mlflow && useradd --uid 1000 --gid mlflow --create-home mlflow
 RUN mkdir -p /mlartifacts && chown -R mlflow:mlflow /mlartifacts

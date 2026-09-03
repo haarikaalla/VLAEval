@@ -123,40 +123,26 @@ jobs:
         run: npm run test
 
   docker-build:
-    name: Docker Build Validation
+    name: Docker Build Validation (${{ matrix.component }})
     runs-on: ubuntu-latest
     needs: [lint-and-type-check, python-tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        # Must stay in sync with the build matrix in cd.yml, otherwise a broken
+        # Dockerfile is only discovered after merge, during deployment.
+        component: [api, worker, frontend, mlflow]
     steps:
       - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: Build API image
+      - name: Build ${{ matrix.component }} image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: docker/api/Dockerfile
+          file: docker/${{ matrix.component }}/Dockerfile
           push: false
-          tags: vla-eval-api:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build worker image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/worker/Dockerfile
-          push: false
-          tags: vla-eval-worker:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build frontend image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/frontend/Dockerfile
-          push: false
-          tags: vla-eval-frontend:ci
+          tags: vla-eval-${{ matrix.component }}:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
