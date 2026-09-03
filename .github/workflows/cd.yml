@@ -33,7 +33,7 @@ jobs:
       matrix:
         component: [api, worker, frontend, mlflow]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: docker/setup-buildx-action@v3
 
@@ -74,7 +74,7 @@ jobs:
       matrix:
         component: [api, worker, frontend]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.24.0
@@ -90,7 +90,7 @@ jobs:
     needs: [build-and-push]
     environment: ${{ github.event.inputs.environment || 'staging' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
