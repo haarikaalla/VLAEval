@@ -1,33 +1,90 @@
 version: 2
+
+# Notes on the settings below:
+#
+# versioning-strategy: increase-if-necessary
+#   pyproject.toml uses open lower bounds ("numpy>=1.26.0"). The default pip
+#   strategy raises that floor whenever a newer release exists, which opens a PR
+#   per package while changing nothing about what actually gets installed -- it
+#   only shrinks the range of versions we support. "increase-if-necessary" only
+#   touches a constraint when the existing one genuinely excludes the new
+#   version, which is the behaviour we want here.
+#
+# groups:
+#   Batches routine minor/patch bumps into one PR per ecosystem. Major bumps
+#   stay separate so they get reviewed on their own merits.
+
 updates:
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
+    versioning-strategy: increase-if-necessary
     labels: ["dependencies", "python"]
+    groups:
+      python-minor-and-patch:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      python-security:
+        applies-to: security-updates
+        patterns: ["*"]
 
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
+    versioning-strategy: increase-if-necessary
     labels: ["dependencies", "frontend"]
+    groups:
+      frontend-minor-and-patch:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      frontend-security:
+        applies-to: security-updates
+        patterns: ["*"]
+    ignore:
+      # ESLint 9+ requires migrating frontend/.eslintrc.cjs to flat config and
+      # dropping the removed --ext flag from the lint script. Unpin once that
+      # migration is done deliberately.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-plugin-*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@typescript-eslint/*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "docker"
-    directory: "/docker/api"
+    directories:
+      - "/docker/api"
+      - "/docker/worker"
+      - "/docker/mlflow"
+      - "/docker/frontend"
+      - "/docker/training"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
     labels: ["dependencies", "docker"]
-
-  - package-ecosystem: "docker"
-    directory: "/docker/frontend"
-    schedule:
-      interval: "weekly"
-    labels: ["dependencies", "docker"]
+    groups:
+      docker-base-images:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      # pyproject.toml declares requires-python = ">=3.10,<3.14", so a major
+      # bump of the python base image fails the build at `pip install -e .`.
+      # Widen requires-python first, then raise this.
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
     labels: ["dependencies", "ci"]
+    groups:
+      github-actions:
+        patterns: ["*"]
