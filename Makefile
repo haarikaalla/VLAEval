@@ -1,4 +1,4 @@
-.PHONY: help install install-dev lint format type-check test test-cov \
+.PHONY: help install install-dev lint format type-check test test-cov security check \
         run-api run-worker docker-build docker-up docker-down \
         download-data train evaluate migrate clean frontend-install frontend-dev frontend-build
 
@@ -31,6 +31,9 @@ test-cov: ## Run tests with coverage report
 security: ## Run bandit security scan
 	bandit -c pyproject.toml -r src
 
+check: lint type-check test security ## Run all quality gates (lint, types, tests, security)
+	@echo "All checks passed."
+
 run-api: ## Run the FastAPI backend locally (reload enabled)
 	uvicorn vla_eval.api.main:app --reload --host 0.0.0.0 --port 8000
 
@@ -49,14 +52,14 @@ docker-down: ## Stop the full stack
 migrate: ## Run database migrations
 	alembic upgrade head
 
-download-data: ## Download a dataset via CLI (usage: make download-data DATASET=lerobot/pusht)
+download-data: ## Download a dataset via CLI (usage: make download-data DATASET=pusht)
 	vla-eval data download $(DATASET)
 
-train: ## Launch training via Hydra config (usage: make train CONFIG=configs/config.yaml)
-	vla-eval train --config-name config
+train: ## Launch training via Hydra config (override e.g. make train ARGS="dataset=pusht model=baseline")
+	python scripts/train.py $(ARGS)
 
-evaluate: ## Run evaluation/benchmark suite
-	vla-eval evaluate --config-name config
+evaluate: ## Run evaluation/benchmark suite via Hydra config
+	python scripts/evaluate.py $(ARGS)
 
 frontend-install: ## Install frontend dependencies
 	cd frontend && npm install
