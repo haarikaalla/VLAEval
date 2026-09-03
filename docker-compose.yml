@@ -1,0 +1,161 @@
+x-app-env: &app-env
+  APP_ENV: ${APP_ENV:-production}
+  APP_SECRET_KEY: ${APP_SECRET_KEY:?APP_SECRET_KEY must be set}
+  DATABASE_URL: postgresql+psycopg2://vla_eval:${POSTGRES_PASSWORD:-vla_eval}@postgres:5432/vla_eval
+  MLFLOW_TRACKING_URI: http://mlflow:5000
+  MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME:-vla-eval}
+  REDIS_URL: redis://redis:6379/0
+  HF_TOKEN: ${HF_TOKEN:-}
+  HF_HOME: /data/hf_cache
+  API_DEFAULT_API_KEY: ${API_DEFAULT_API_KEY:?API_DEFAULT_API_KEY must be set}
+  API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:8080}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vla_eval
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vla_eval}
+      POSTGRES_DB: vla_eval
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-mlflow-db.sql:/docker-entrypoint-initdb.d/init-mlflow-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vla_eval"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [vla-eval-net]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [vla-eval-net]
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: docker/mlflow/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      BACKEND_STORE_URI: postgresql+psycopg2://vla_eval:${POSTGRES_PASSWORD:-vla_eval}@postgres:5432/mlflow
+    command: >
+      --host 0.0.0.0 --port 5000
+      --backend-store-uri postgresql+psycopg2://vla_eval:${POSTGRES_PASSWORD:-vla_eval}@postgres:5432/mlflow
+      --default-artifact-root /mlartifacts
+      --serve-artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_artifacts:/mlartifacts
+    networks: [vla-eval-net]
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    environment:
+      <<: *app-env
+    ports:
+      - "8000:8000"
+    volumes:
+      - hf_cache:/data/hf_cache
+      - dataset_cache:/app/data
+      - model_checkpoints:/app/models
+      - report_artifacts:/app/reports
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [vla-eval-net]
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    environment:
+      <<: *app-env
+    volumes:
+      - hf_cache:/data/hf_cache
+      - dataset_cache:/app/data
+      - model_checkpoints:/app/models
+      - report_artifacts:/app/reports
+    deploy:
+      replicas: 1
+    networks: [vla-eval-net]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "8080:8080"
+    networks: [vla-eval-net]
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    restart: unless-stopped
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks: [vla-eval-net]
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks: [vla-eval-net]
+
+networks:
+  vla-eval-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mlflow_artifacts:
+  hf_cache:
+  dataset_cache:
+  model_checkpoints:
+  report_artifacts:
+  prometheus_data:
+  grafana_data:

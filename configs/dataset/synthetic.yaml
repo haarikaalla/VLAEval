@@ -1,0 +1,8 @@
+# Dataset configuration: synthetic data for local dev/testing (no network required)
+name: synthetic
+hub_repo_id: null
+num_samples: 256
+action_dim: 7
+state_dim: 7
+image_size: [224, 224]
+val_ratio: 0.1

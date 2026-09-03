@@ -1,0 +1,8 @@
+# Dataset configuration: ALOHA bimanual insertion (simulation)
+name: aloha_sim_insertion_human
+hub_repo_id: lerobot/aloha_sim_insertion_human
+cache_dir: ./data/cache
+processed_dir: ./data/processed
+image_size: [224, 224]
+max_episodes: null
+val_ratio: 0.1

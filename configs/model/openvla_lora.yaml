@@ -1,0 +1,8 @@
+# Model configuration: OpenVLA 7B fine-tuned via LoRA
+name: openvla
+type: openvla
+checkpoint: openvla/openvla-7b
+action_dim: 7
+load_in_4bit: true
+use_lora: true
+lora_rank: 32

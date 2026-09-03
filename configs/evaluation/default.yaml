@@ -1,0 +1,7 @@
+# Evaluation/benchmark configuration
+max_samples: null
+report_dir: ./reports/generated
+closed_loop:
+  enabled: false
+  num_episodes: 20
+  max_steps: 300

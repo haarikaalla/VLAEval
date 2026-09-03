@@ -1,0 +1,5 @@
+# Model configuration: lightweight CNN baseline (fast, no GPU required)
+name: baseline-cnn
+type: baseline-cnn
+action_dim: 7
+state_dim: 7

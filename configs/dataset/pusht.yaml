@@ -1,0 +1,8 @@
+# Dataset configuration: Push-T manipulation task (simulation)
+name: pusht
+hub_repo_id: lerobot/pusht
+cache_dir: ./data/cache
+processed_dir: ./data/processed
+image_size: [224, 224]
+max_episodes: null
+val_ratio: 0.1

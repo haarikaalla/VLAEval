@@ -1,0 +1,21 @@
+# Local development overrides. Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.override.yml up
+# Provides live-reload of the API on source changes and skips
+# building the frontend production image (use `npm run dev` locally instead).
+
+services:
+  api:
+    build:
+      target: runtime
+    environment:
+      APP_ENV: development
+    volumes:
+      - ./src:/app/src:ro
+      - ./configs:/app/configs:ro
+    command: ["--host", "0.0.0.0", "--port", "8000", "--reload"]
+    ports:
+      - "8000:8000"
+
+  worker:
+    volumes:
+      - ./src:/app/src:ro

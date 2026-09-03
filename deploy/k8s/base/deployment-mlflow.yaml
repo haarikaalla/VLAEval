@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vla-eval-mlflow
+  namespace: vla-eval
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vla-eval-mlflow
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vla-eval-mlflow
+    spec:
+      containers:
+        - name: mlflow
+          image: ghcr.io/your-org/vla-eval-mlflow:latest
+          args:
+            - "--host=0.0.0.0"
+            - "--port=5000"
+            - "--backend-store-uri=$(MLFLOW_BACKEND_STORE_URI)"
+            - "--default-artifact-root=/mlartifacts"
+            - "--serve-artifacts"
+          ports:
+            - containerPort: 5000
+          env:
+            - name: MLFLOW_BACKEND_STORE_URI
+              valueFrom:
+                secretKeyRef:
+                  name: vla-eval-secrets
+                  key: MLFLOW_BACKEND_STORE_URI
+          volumeMounts:
+            - name: mlartifacts
+              mountPath: /mlartifacts
+          readinessProbe:
+            httpGet: { path: /health, port: 5000 }
+            initialDelaySeconds: 10
+      volumes:
+        - name: mlartifacts
+          persistentVolumeClaim:
+            claimName: vla-eval-mlflow-artifacts
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vla-eval-mlflow
+  namespace: vla-eval
+spec:
+  selector:
+    app.kubernetes.io/name: vla-eval-mlflow
+  ports:
+    - port: 5000
+      targetPort: 5000

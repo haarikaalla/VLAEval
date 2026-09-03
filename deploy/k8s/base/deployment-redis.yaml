@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vla-eval-redis
+  namespace: vla-eval
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vla-eval-redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vla-eval-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits: { cpu: "200m", memory: "256Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vla-eval-redis
+  namespace: vla-eval
+spec:
+  selector:
+    app.kubernetes.io/name: vla-eval-redis
+  ports:
+    - port: 6379
+      targetPort: 6379

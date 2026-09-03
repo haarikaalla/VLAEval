@@ -1,0 +1,15 @@
+# LoRA fine-tuning preset for large backbones (e.g. OpenVLA)
+run_name: vla-lora-finetune
+experiment_name: vla-eval
+num_epochs: 5
+batch_size: 8
+learning_rate: 5.0e-5
+weight_decay: 1.0e-4
+warmup_steps: 50
+grad_clip_norm: 1.0
+num_workers: 4
+device: cuda
+checkpoint_dir: ./models/checkpoints
+val_ratio: 0.05
+early_stopping_patience: 3
+log_every_n_steps: 10

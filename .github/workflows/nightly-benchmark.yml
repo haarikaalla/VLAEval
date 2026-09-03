@@ -1,0 +1,40 @@
+name: Nightly Benchmark
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # Daily at 06:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: Run Offline Benchmark Suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install CPU-only torch
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install project
+        run: pip install -e .
+
+      - name: Run benchmark on synthetic dataset (smoke test for the pipeline)
+        run: |
+          vla-eval evaluate --model baseline-cnn --dataset synthetic --report-dir ./reports/nightly
+
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-benchmark-report
+          path: reports/nightly/
+          retention-days: 30

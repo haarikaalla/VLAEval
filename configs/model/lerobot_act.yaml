@@ -1,0 +1,6 @@
+# Model configuration: LeRobot ACT (Action Chunking Transformer) policy
+name: lerobot-act
+type: lerobot-act
+policy_type: act
+action_dim: 14
+pretrained_path: null

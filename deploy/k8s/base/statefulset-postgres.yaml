@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vla-eval-postgres
+  namespace: vla-eval
+spec:
+  serviceName: vla-eval-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vla-eval-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vla-eval-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: vla_eval
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: vla-eval-secrets
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: vla_eval
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "vla_eval"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vla-eval-postgres
+  namespace: vla-eval
+spec:
+  selector:
+    app.kubernetes.io/name: vla-eval-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  clusterIP: None
