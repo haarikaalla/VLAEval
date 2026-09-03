@@ -2,7 +2,7 @@
 # Background worker image: same runtime dependencies as the API, but runs the
 # job-polling worker loop instead of the HTTP server.
 
-FROM python:3.11-slim AS base
+FROM python:3.14-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -27,7 +27,7 @@ RUN pip install --upgrade pip && \
     pip install -r requirements.txt && \
     pip install --no-deps -e .
 
-FROM python:3.11-slim AS runtime
+FROM python:3.14-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \

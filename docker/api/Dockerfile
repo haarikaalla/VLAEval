@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Base stage: shared OS deps + Python virtualenv
 # ---------------------------------------------------------------------------
-FROM python:3.11-slim AS base
+FROM python:3.14-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -38,7 +38,7 @@ RUN pip install --upgrade pip && \
 # ---------------------------------------------------------------------------
 # Runtime stage: minimal image with only what's needed to run the API
 # ---------------------------------------------------------------------------
-FROM python:3.11-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
