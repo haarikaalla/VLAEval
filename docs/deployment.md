@@ -63,9 +63,9 @@ kubectl apply -k deploy/k8s/overlays/production
 Before applying to a real cluster:
 
 1. **Secrets**: replace the placeholder values in `overlays/{staging,production}/secret.yaml` with real secrets — ideally via a secret manager (Sealed Secrets, External Secrets Operator, SOPS) rather than committing plaintext.
-2. **Images**: the overlays reference GHCR images tagged `staging`/`latest`, built and pushed by the `cd.yml` GitHub Actions workflow. Point `kustomization.yaml` `images:` entries at your own registry if not using GHCR.
+2. **Images**: the overlays reference GHCR images tagged `latest`, built and pushed by the `cd.yml` GitHub Actions workflow as `ghcr.io/<owner>/<repo lowercased>-<component>`. Point `kustomization.yaml` `images:` entries at your own registry if not using GHCR.
 3. **Storage**: `base/pvc.yaml` requests `ReadWriteMany` PVCs (dataset cache, model checkpoints, MLflow artifacts) — ensure your cluster's default StorageClass supports RWX (e.g. NFS, EFS, Azure Files), or switch to `ReadWriteOnce` + per-pod storage if not needed across replicas.
-4. **GPU workers**: `base/deployment-worker.yaml` includes a commented `nvidia.com/gpu: "1"` resource limit for GPU-backed training; uncomment it only if your node pool has GPU nodes and the NVIDIA device plugin installed. Remove it entirely for CPU-only clusters.
+4. **GPU workers**: `base/deployment-worker.yaml` sets an `nvidia.com/gpu: "1"` resource limit for GPU-backed training; keep it only if your node pool has GPU nodes and the NVIDIA device plugin installed. The `staging` overlay already removes it (`patch-worker-cpu.yaml`) for CPU-only clusters.
 5. **Ingress/TLS**: `base/ingress.yaml` assumes an `nginx` IngressClass and `cert-manager` for TLS — adjust annotations/`ClusterIssuer` name to match your cluster.
 
 Scaling: `deployment-api` and `deployment-worker` include `HorizontalPodAutoscaler` resources (API: 2–10 replicas at 70% CPU; worker: 1–5 replicas) — tune thresholds based on observed load.
@@ -75,7 +75,8 @@ Scaling: `deployment-api` and `deployment-worker` include `HorizontalPodAutoscal
 GitHub Actions workflows (`.github/workflows/`):
 
 - **`ci.yml`** — lint + type-check, pytest matrix (3.10/3.11/3.12), security scan (bandit + pip-audit), frontend lint/test, Docker build validation. Runs on every push/PR.
-- **`cd.yml`** — builds and pushes `api`/`worker`/`frontend`/`mlflow` images to GHCR, scans images with Trivy, then deploys to the target environment (`staging` on `main`, `production` on tags/manual dispatch) via `kubectl` + Kustomize.
+- **`cd.yml`** — builds and pushes `api`/`worker`/`frontend`/`mlflow` images to GHCR and scans them with Trivy. It does **not** deploy.
+- **`deploy.yml`** — manual (`workflow_dispatch`) rollout to `staging` or `production` via `kubectl` + Kustomize. It requires a `KUBE_CONFIG` secret; a preflight job checks for it before the environment-bound job starts, so a missing cluster fails fast without recording a failed deployment.
 - **`security.yml`** — CodeQL (Python + JS/TS), Dependabot dependency review on PRs, secret scanning via gitleaks.
 - **`nightly-benchmark.yml`** — scheduled run of the offline benchmark suite against the baseline model, uploading the generated report as a workflow artifact.
 

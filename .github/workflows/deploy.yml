@@ -1,0 +1,97 @@
+name: Deploy
+
+# Deployment is manual and opt-in. It is deliberately NOT triggered by pushes:
+# a push-triggered deploy against a repo with no cluster produced permanently
+# "failed" deployment records in the Environments tab.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target deployment environment"
+        required: true
+        default: "staging"
+        type: choice
+        options: [staging, production]
+      image_tag:
+        description: "Image tag to roll out (defaults to the checked-out commit)"
+        required: false
+        default: ""
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # Runs WITHOUT an `environment:` binding, so a missing kubeconfig fails here
+  # and no GitHub deployment record is ever created.
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    outputs:
+      image_namespace: ${{ steps.vars.outputs.image_namespace }}
+      image_tag: ${{ steps.vars.outputs.image_tag }}
+    steps:
+      - id: vars
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+          INPUT_TAG: ${{ inputs.image_tag }}
+        run: |
+          if [ -z "$KUBE_CONFIG" ]; then
+            echo "::error::KUBE_CONFIG secret is not set - configure a cluster before deploying."
+            exit 1
+          fi
+
+          # GHCR rejects image names containing uppercase characters.
+          echo "image_namespace=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${INPUT_TAG:-sha-${GITHUB_SHA}}" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    needs: [preflight]
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.30.0"
+
+      - name: Configure kubeconfig
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "$KUBE_CONFIG" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+          kubectl cluster-info
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -k "deploy/k8s/overlays/${{ inputs.environment }}"
+
+      - name: Roll out built image tags
+        run: |
+          IMAGE_PREFIX="${{ env.REGISTRY }}/${{ needs.preflight.outputs.image_namespace }}"
+          IMAGE_TAG="${{ needs.preflight.outputs.image_tag }}"
+
+          for component in api worker frontend mlflow; do
+            kubectl set image "deployment/vla-eval-${component}" \
+              "${component}=${IMAGE_PREFIX}-${component}:${IMAGE_TAG}" \
+              -n vla-eval
+          done
+
+      - name: Wait for rollout
+        run: |
+          for component in mlflow api worker frontend; do
+            kubectl rollout status "deployment/vla-eval-${component}" \
+              -n vla-eval --timeout=300s
+          done
