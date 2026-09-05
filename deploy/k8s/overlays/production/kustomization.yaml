@@ -4,12 +4,8 @@ namespace: vla-eval
 resources:
   - ../../base
   - secret.yaml
-configMapGenerator:
-  - name: vla-eval-config
-    behavior: merge
-    literals:
-      - APP_ENV=production
-      - API_CORS_ORIGINS=https://vla-eval.example.com
+patches:
+  - path: patch-config.yaml
 images:
   - name: ghcr.io/haarikaalla/vlaeval-api
     newTag: latest

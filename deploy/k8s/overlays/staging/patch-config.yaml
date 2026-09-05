@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vla-eval-config
+  namespace: vla-eval
+data:
+  APP_ENV: "staging"
+  API_CORS_ORIGINS: "https://staging.vla-eval.example.com"
+  # Staging runs on CPU-only nodes (see patch-worker-cpu.yaml).
+  TRAINING_DEVICE: "cpu"

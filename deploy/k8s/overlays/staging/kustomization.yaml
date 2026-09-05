@@ -7,16 +7,11 @@ resources:
 namePrefix: ""
 patches:
   - path: patch-replicas.yaml
+  - path: patch-config.yaml
   - path: patch-worker-cpu.yaml
     target:
       kind: Deployment
       name: vla-eval-worker
-configMapGenerator:
-  - name: vla-eval-config
-    behavior: merge
-    literals:
-      - APP_ENV=staging
-      - API_CORS_ORIGINS=https://staging.vla-eval.example.com
 images:
   # Image names must match what CD publishes: ghcr.io/<owner>/<repo lowercased>-<component>.
   # The "latest" tag is published on every default-branch build; the deploy job
