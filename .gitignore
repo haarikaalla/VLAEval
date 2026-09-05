@@ -32,7 +32,7 @@ data/raw/
 data/processed/
 data/cache/
 datasets_cache/
-models/
+/models/
 *.ckpt
 *.pt
 *.pth
