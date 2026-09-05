@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: mlflow
-          image: ghcr.io/haarikaalla/vla-eval-mlflow:latest
+          image: ghcr.io/haarikaalla/vlaeval-mlflow:latest
           args:
             - "--host=0.0.0.0"
             - "--port=5000"

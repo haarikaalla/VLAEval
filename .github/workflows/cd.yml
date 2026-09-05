@@ -154,9 +154,13 @@ jobs:
           kubectl set image deployment/vla-eval-frontend \
             frontend="${IMAGE_PREFIX}-frontend:${IMAGE_TAG}" \
             -n vla-eval
+          kubectl set image deployment/vla-eval-mlflow \
+            mlflow="${IMAGE_PREFIX}-mlflow:${IMAGE_TAG}" \
+            -n vla-eval
 
       - name: Wait for rollout
         run: |
+          kubectl rollout status deployment/vla-eval-mlflow -n vla-eval --timeout=300s
           kubectl rollout status deployment/vla-eval-api -n vla-eval --timeout=300s
           kubectl rollout status deployment/vla-eval-worker -n vla-eval --timeout=300s
           kubectl rollout status deployment/vla-eval-frontend -n vla-eval --timeout=300s

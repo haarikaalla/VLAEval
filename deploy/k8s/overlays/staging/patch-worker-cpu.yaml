@@ -1,0 +1,8 @@
+# Staging runs on a CPU-only cluster: requesting nvidia.com/gpu leaves the
+# worker pods permanently Pending, which makes `kubectl rollout status` time out
+# and the deployment fail.
+- op: remove
+  path: /spec/template/spec/containers/0/resources/limits/nvidia.com~1gpu
+- op: replace
+  path: /spec/replicas
+  value: 1

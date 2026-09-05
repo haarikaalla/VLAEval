@@ -11,9 +11,11 @@ configMapGenerator:
       - APP_ENV=production
       - API_CORS_ORIGINS=https://vla-eval.example.com
 images:
-  - name: ghcr.io/haarikaalla/vla-eval-api
+  - name: ghcr.io/haarikaalla/vlaeval-api
     newTag: latest
-  - name: ghcr.io/haarikaalla/vla-eval-worker
+  - name: ghcr.io/haarikaalla/vlaeval-worker
     newTag: latest
-  - name: ghcr.io/haarikaalla/vla-eval-frontend
+  - name: ghcr.io/haarikaalla/vlaeval-frontend
+    newTag: latest
+  - name: ghcr.io/haarikaalla/vlaeval-mlflow
     newTag: latest

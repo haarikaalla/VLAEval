@@ -146,3 +146,33 @@ jobs:
           tags: vla-eval-${{ matrix.component }}:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  k8s-manifests:
+    name: Kubernetes Manifest Validation (${{ matrix.overlay }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        overlay: [staging, production]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.30.0"
+
+      - name: Render overlay
+        run: |
+          kubectl kustomize "deploy/k8s/overlays/${{ matrix.overlay }}" > rendered.yaml
+          test -s rendered.yaml
+
+      - name: Verify images match the tags CD publishes
+        run: |
+          # CD pushes ghcr.io/<owner>/<repo lowercased>-<component>. A mismatch
+          # here means ImagePullBackOff and a failed deployment.
+          expected="ghcr.io/${GITHUB_REPOSITORY,,}"
+          if grep -oE 'image: ghcr\.io/[^:]+' rendered.yaml | grep -v "^image: ${expected}-"; then
+            echo "::error::Rendered manifests reference images that CD does not publish (expected prefix ${expected}-)."
+            exit 1
+          fi

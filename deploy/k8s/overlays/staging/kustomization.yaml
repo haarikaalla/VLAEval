@@ -7,6 +7,10 @@ resources:
 namePrefix: ""
 patches:
   - path: patch-replicas.yaml
+  - path: patch-worker-cpu.yaml
+    target:
+      kind: Deployment
+      name: vla-eval-worker
 configMapGenerator:
   - name: vla-eval-config
     behavior: merge
@@ -14,9 +18,14 @@ configMapGenerator:
       - APP_ENV=staging
       - API_CORS_ORIGINS=https://staging.vla-eval.example.com
 images:
-  - name: ghcr.io/haarikaalla/vla-eval-api
-    newTag: staging
-  - name: ghcr.io/haarikaalla/vla-eval-worker
-    newTag: staging
-  - name: ghcr.io/haarikaalla/vla-eval-frontend
-    newTag: staging
+  # Image names must match what CD publishes: ghcr.io/<owner>/<repo lowercased>-<component>.
+  # The "latest" tag is published on every default-branch build; the deploy job
+  # then pins the exact commit via `kubectl set image`.
+  - name: ghcr.io/haarikaalla/vlaeval-api
+    newTag: latest
+  - name: ghcr.io/haarikaalla/vlaeval-worker
+    newTag: latest
+  - name: ghcr.io/haarikaalla/vlaeval-frontend
+    newTag: latest
+  - name: ghcr.io/haarikaalla/vlaeval-mlflow
+    newTag: latest
