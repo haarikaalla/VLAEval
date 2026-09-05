@@ -140,7 +140,23 @@ jobs:
         run: |
           kubectl apply -k deploy/k8s/overlays/${{ github.event.inputs.environment || 'staging' }}
 
+      - name: Deploy built image tags
+        run: |
+          IMAGE_PREFIX="${{ env.REGISTRY }}/${{ needs.prepare.outputs.image_namespace }}"
+          IMAGE_TAG="sha-${{ github.sha }}"
+
+          kubectl set image deployment/vla-eval-api \
+            api="${IMAGE_PREFIX}-api:${IMAGE_TAG}" \
+            -n vla-eval
+          kubectl set image deployment/vla-eval-worker \
+            worker="${IMAGE_PREFIX}-worker:${IMAGE_TAG}" \
+            -n vla-eval
+          kubectl set image deployment/vla-eval-frontend \
+            frontend="${IMAGE_PREFIX}-frontend:${IMAGE_TAG}" \
+            -n vla-eval
+
       - name: Wait for rollout
         run: |
           kubectl rollout status deployment/vla-eval-api -n vla-eval --timeout=300s
+          kubectl rollout status deployment/vla-eval-worker -n vla-eval --timeout=300s
           kubectl rollout status deployment/vla-eval-frontend -n vla-eval --timeout=300s

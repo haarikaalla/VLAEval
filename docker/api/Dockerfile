@@ -32,6 +32,7 @@ COPY src ./src
 COPY README.md ./
 
 RUN pip install --upgrade pip && \
+    pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
     pip install -r requirements.txt && \
     pip install --no-deps -e .
 

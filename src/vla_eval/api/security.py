@@ -15,9 +15,10 @@ import hmac
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
+from jwt import InvalidTokenError
 
 from vla_eval.core.config import Settings, get_settings
 from vla_eval.core.logging import get_logger
@@ -79,7 +80,7 @@ def verify_access_token(
         )
         subject: str = payload["sub"]
         return subject
-    except JWTError as exc:
+    except InvalidTokenError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token."
         ) from exc
