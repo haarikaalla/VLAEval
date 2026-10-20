@@ -1,398 +1,538 @@
 <div align="center">
 
-# 🤖 VLA-Eval
+# VLA-Eval
 
-### Train, benchmark and rank **Vision-Language-Action** robotics policies — end to end.
+### An end-to-end engineering platform for training, evaluating and operating Vision-Language-Action policies
 
-[![CI](https://img.shields.io/badge/CI-passing-2EA043?style=for-the-badge&logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-31%20passing-2EA043?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
-[![mypy](https://img.shields.io/badge/mypy-clean-1F6FEB?style=for-the-badge&logo=python&logoColor=white)](pyproject.toml)
-[![Bandit](https://img.shields.io/badge/security-0%20issues-2EA043?style=for-the-badge&logo=shieldsdotio&logoColor=white)](pyproject.toml)
-
-[![Python](https://img.shields.io/badge/Python-3.10--3.13-3776AB?logo=python&logoColor=white)](pyproject.toml)
-[![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![MLflow](https://img.shields.io/badge/MLflow-0194E2?logo=mlflow&logoColor=white)](https://mlflow.org/)
-[![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
-[![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?logo=kubernetes&logoColor=white)](deploy/k8s)
-[![Hugging Face](https://img.shields.io/badge/🤗%20Datasets-FFD21E?logoColor=black)](https://huggingface.co/lerobot)
-[![License](https://img.shields.io/badge/License-Apache%202.0-D22128?logo=apache&logoColor=white)](LICENSE)
+[![CI](https://github.com/haarikaalla/VLAEval/actions/workflows/ci.yml/badge.svg)](https://github.com/haarikaalla/VLAEval/actions/workflows/ci.yml)
+[![Security](https://github.com/haarikaalla/VLAEval/actions/workflows/security.yml/badge.svg)](https://github.com/haarikaalla/VLAEval/actions/workflows/security.yml)
+[![Nightly benchmark](https://github.com/haarikaalla/VLAEval/actions/workflows/nightly-benchmark.yml/badge.svg)](https://github.com/haarikaalla/VLAEval/actions/workflows/nightly-benchmark.yml)
+![Tests](https://img.shields.io/badge/tests-31-2EA043?logo=pytest&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.10--3.12%20CI-3776AB?logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-policy%20runtime-EE4C2C?logo=pytorch&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-control%20plane-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-TypeScript-61DAFB?logo=react&logoColor=black)
+![License](https://img.shields.io/badge/License-Apache%202.0-D22128?logo=apache&logoColor=white)
 
 </div>
 
-**VLA-Eval** automates dataset acquisition, preprocessing, training/fine-tuning, benchmarking, experiment tracking, reporting, and leaderboard publishing for models such as [OpenVLA](https://openvla.github.io/) and [LeRobot](https://github.com/huggingface/lerobot) policies (ACT, Diffusion Policy, VQ-BeT, TD-MPC). It runs on **real robot datasets** from the Hugging Face Hub.
+VLA-Eval is a production-shaped research platform for **Vision-Language-Action (VLA) robotics evaluation**. It brings dataset discovery, reproducible preprocessing, policy adapters, baseline training, open-loop benchmarking, experiment tracking, persistent jobs, report generation and leaderboard publishing into one coherent system.
 
-```bash
-cp .env.example .env && docker compose up -d --build
-```
+The project is designed to answer a larger engineering question than “can a model produce an action?”:
 
-| | Service | URL |
-| :--: | --- | --- |
-| 🎛️ | **Dashboard** | http://localhost:8080 |
-| 📘 | **API docs (Swagger)** | http://localhost:8000/api/docs |
-| 📈 | **MLflow** | http://localhost:5000 |
-| 📊 | **Grafana** | http://localhost:3000 |
+> How can a robotics team run comparable policy experiments, preserve their evidence, expose results through stable interfaces and operate the workflow beyond a single notebook?
 
----
+VLA-Eval addresses that question with a typed Python core, FastAPI control plane, React dashboard, MLflow tracking, PostgreSQL-backed job state, Docker Compose environment, Kubernetes overlays and multi-layer CI/CD.
 
-## Table of Contents
+> **Scope statement:** the lightweight CNN baseline has a complete, tested train → evaluate → report path. OpenVLA and LeRobot adapters provide a common loading and inference interface, but their architecture-specific training losses are not yet integrated into the generic trainer. The README distinguishes implemented behavior from extension points so that platform maturity is clear and reproducible.
 
-- [Features](#features)
-- [Architecture](#architecture)
-- [Datasets & Models](#datasets--models)
-- [Quickstart](#quickstart)
-  - [Docker Compose (recommended)](#docker-compose-recommended)
-  - [Local development](#local-development)
-- [CLI Usage](#cli-usage)
-- [API Usage](#api-usage)
-- [Configuration](#configuration)
-- [Testing](#testing)
-- [Deployment](#deployment)
-- [Documentation](#documentation)
-- [Contributing](#contributing)
-- [Security](#security)
-- [License](#license)
+## Contents
 
-## Features
+- [Why this is an advanced engineering project](#why-this-is-an-advanced-engineering-project)
+- [Capability and maturity map](#capability-and-maturity-map)
+- [System architecture](#system-architecture)
+- [End-to-end workflows](#end-to-end-workflows)
+- [Datasets](#datasets)
+- [Policies and training support](#policies-and-training-support)
+- [Evaluation contract](#evaluation-contract)
+- [Quick start](#quick-start)
+- [CLI and configuration](#cli-and-configuration)
+- [API and dashboard](#api-and-dashboard)
+- [Experiment tracking and operations](#experiment-tracking-and-operations)
+- [Testing, security and delivery](#testing-security-and-delivery)
+- [Known boundaries and roadmap](#known-boundaries-and-roadmap)
+- [Repository map](#repository-map)
 
-| | Capability | What you get |
-| :--: | --- | --- |
-| 📦 | **Dataset management** | Curated registry of public robotics datasets (PushT, ALOHA, xArm, BridgeData V2, Berkeley UR5) from the HF Hub, with download, caching, preprocessing and revision pinning |
-| 🧠 | **Model zoo** | Pluggable registry: CPU baseline CNN, OpenVLA (4-bit + LoRA), LeRobot ACT & Diffusion Policy |
-| 🎯 | **Training** | `Trainer` with AdamW + OneCycleLR, early stopping, checkpointing, full [MLflow](https://mlflow.org/) tracking |
-| 📊 | **Evaluation** | Open-loop and closed-loop benchmarks, composite scoring, auto-generated Markdown reports with charts |
-| 🏆 | **Leaderboard** | Ranked, filterable, database-backed — exposed via API and the React dashboard |
-| 🔌 | **API** | Versioned FastAPI backend, API-key + JWT auth, Prometheus metrics, structured logs, async job orchestration |
-| 🎛️ | **Frontend** | React + TypeScript + Vite dashboard for datasets, jobs and the leaderboard |
-| ⚙️ | **Experiment configs** | Hydra/OmegaConf composition with multirun sweep support |
-| 🚀 | **Production ops** | Docker Compose stack (Postgres, Redis, MLflow, Prometheus, Grafana), Kubernetes/Kustomize overlays, GitHub Actions CI/CD |
+## Why this is an advanced engineering project
 
-## Architecture
+VLA-Eval demonstrates the system design around a machine-learning model, not only the model definition itself.
 
-A five-stage pipeline: pull real robot data → train a policy → benchmark it → publish to the leaderboard.
+| Engineering concern | What the repository demonstrates |
+| --- | --- |
+| Stable abstractions | A shared `VLAPolicy` contract decouples evaluation and serving from specific policy implementations |
+| Reproducible data | Curated dataset metadata, Hugging Face revision support, deterministic synthetic fixtures and saved normalization statistics |
+| Training lifecycle | PyTorch behavior-cloning loop with AdamW, OneCycleLR, gradient clipping, validation, early stopping and best/final checkpoints |
+| Evaluation discipline | Action-error metrics, latency percentiles, throughput, optional rollout success and explicit composite-score semantics |
+| Experiment evidence | MLflow parameters and per-epoch metrics plus generated Markdown reports and charts |
+| Durable orchestration | Database-backed job states and leaderboard records survive API restarts |
+| Multiple interfaces | The same capabilities are exposed through Python modules, Typer CLI, Hydra scripts, REST API and React UI |
+| Operational visibility | Structured request logs, request IDs, health/readiness probes, Prometheus and provisioned Grafana dashboards |
+| Delivery engineering | Per-service containers, Compose, Kubernetes/Kustomize overlays, GHCR image publishing and manual gated deployment |
+| Quality controls | Python and frontend tests, lint, formatting, typing, CodeQL, secret scanning, image scanning and manifest rendering |
+
+The important design choice is separation of concerns: dataset code does not know about HTTP, evaluation does not know about React, and model adapters implement a narrow interface consumed by the benchmark engine.
+
+## Capability and maturity map
+
+This table is the fastest way to understand what is complete today.
+
+| Capability | Status | Evidence / boundary |
+| --- | :---: | --- |
+| Synthetic offline demonstration | ✅ Complete | Deterministic, network-free pipeline used by tests and nightly smoke benchmarks |
+| Baseline CNN training | ✅ Complete | Fully tested training, validation, early stopping and checkpoint round trip |
+| Open-loop policy evaluation | ✅ Complete | Action MSE/MAE/max error, per-dimension error and latency statistics |
+| Reports and leaderboard | ✅ Complete | Markdown + chart generation; API evaluations persist ranked database entries |
+| Public dataset registry | ✅ Complete | Simulated and physical-robot LeRobot datasets with license/action metadata |
+| Hugging Face acquisition | ✅ Complete | LeRobot-native loader with Hub snapshot fallback and programmatic revision pinning |
+| OpenVLA adapter | 🟡 Adapter | Lazy loading, quantization configuration, LoRA attachment and inference interface; native fine-tuning loop remains future work |
+| LeRobot ACT/Diffusion adapters | 🟡 Adapter | Lazy policy loading and inference interface; native action-chunking/diffusion training remains future work |
+| Closed-loop evaluation | 🟡 Extension | Generic rollout protocol and benchmark exist; no concrete simulator adapter is bundled |
+| Distributed jobs | 🟡 Foundation | Persistent SQL jobs and worker claiming exist; production queue ownership should be unified before horizontal scale |
+| JWT browser authentication | 🟡 Foundation | Token issuance/verification exists; current write endpoints enforce the API-key dependency |
+| Redis, S3 and rate limits | ⚪ Planned | Configuration placeholders exist, but they are not active runtime dependencies in the current execution path |
+
+Legend: ✅ complete and exercised · 🟡 implemented foundation or adapter with an explicit integration boundary · ⚪ planned contract, not active behavior.
+
+## System architecture
 
 ```mermaid
-flowchart LR
-    HF["🤗 Hugging Face Hub<br/><b>lerobot/*</b> datasets"]:::src
-    D["📦 Data<br/>download · preprocess"]:::data
-    T["🎯 Training<br/>Trainer · LoRA"]:::train
-    E["📊 Evaluation<br/>benchmark · report"]:::eval
-    L["🏆 Leaderboard<br/>API · dashboard"]:::lead
+flowchart TB
+    subgraph Clients[Interaction layer]
+        UI[React + TypeScript dashboard]
+        CLI[Typer CLI]
+        HYDRA[Hydra experiment scripts]
+        REST[REST clients]
+    end
 
-    HF --> D --> T --> E --> L
-    T -.metrics.-> M["📈 MLflow"]:::store
-    E -.metrics.-> M
+    subgraph Control[Control plane]
+        API[FastAPI<br/>validation · auth · request IDs]
+        JOBS[(PostgreSQL / SQLite<br/>jobs + leaderboard)]
+        WORKER[Background worker]
+    end
 
-    classDef src fill:#FFD21E,stroke:#B8930B,stroke-width:2px,color:#1a1a1a
-    classDef data fill:#4FC3F7,stroke:#0277BD,stroke-width:2px,color:#0b2b3a
-    classDef train fill:#81C784,stroke:#2E7D32,stroke-width:2px,color:#10280f
-    classDef eval fill:#BA68C8,stroke:#6A1B9A,stroke-width:2px,color:#fff
-    classDef lead fill:#FF8A65,stroke:#D84315,stroke-width:2px,color:#331005
-    classDef store fill:#ECEFF1,stroke:#607D8B,stroke-width:2px,color:#263238
+    subgraph Core[ML execution plane]
+        DATA[Dataset registry<br/>download · preprocess]
+        POLICY[Policy registry<br/>baseline · OpenVLA · LeRobot]
+        TRAIN[Baseline trainer<br/>checkpoints · early stop]
+        EVAL[Benchmark engine<br/>accuracy · latency · rollout protocol]
+        REPORT[Reports + charts]
+    end
+
+    subgraph Evidence[Evidence and observability]
+        HF[Hugging Face / LeRobot]
+        MLFLOW[MLflow tracking]
+        ART[(Checkpoint + report volumes)]
+        PROM[Prometheus]
+        GRAF[Grafana]
+    end
+
+    UI --> API
+    REST --> API
+    CLI --> DATA
+    CLI --> TRAIN
+    CLI --> EVAL
+    HYDRA --> TRAIN
+    HYDRA --> EVAL
+    API --> JOBS
+    WORKER --> JOBS
+    API --> DATA
+    WORKER --> DATA
+    WORKER --> TRAIN
+    WORKER --> EVAL
+    DATA --> HF
+    DATA --> POLICY
+    POLICY --> TRAIN
+    POLICY --> EVAL
+    TRAIN --> MLFLOW
+    TRAIN --> ART
+    EVAL --> REPORT
+    EVAL --> JOBS
+    REPORT --> ART
+    API --> PROM --> GRAF
 ```
 
-<table>
-<tr>
-<td width="33%" valign="top">
+### Architectural responsibilities
 
-### 🖥️ Interfaces
-`React dashboard` · `Typer CLI` · `REST API`
-
-Submit jobs from the browser, the terminal, or `curl`.
-
-</td>
-<td width="33%" valign="top">
-
-### ⚙️ Core engine
-`data` · `models` · `training` · `evaluation`
-
-Pure Python, no framework lock-in. Swap models via a registry key.
-
-</td>
-<td width="33%" valign="top">
-
-### 💾 State
-`PostgreSQL` · `MLflow` · `HF Hub`
-
-Jobs and leaderboard persist; runs and artifacts tracked.
-
-</td>
-</tr>
-</table>
-
-<details>
-<summary><b>🔍 How a training job flows through the system</b></summary>
-
-| # | Stage | What happens |
-| --- | --- | --- |
-| 1 | **Submit** | `POST /api/v1/training/jobs` → a `Job` row is persisted as `PENDING` |
-| 2 | **Claim** | API thread pool or a standalone worker atomically claims it (`SELECT … FOR UPDATE SKIP LOCKED` on Postgres) |
-| 3 | **Prepare** | Dataset downloaded/cached from the HF Hub, preprocessed, split train/val |
-| 4 | **Train** | `Trainer.fit()` — AdamW + OneCycleLR, early stopping, checkpointing |
-| 5 | **Track** | Params, per-epoch metrics and artifacts stream to MLflow |
-| 6 | **Evaluate** | Benchmark produces a 0–100 composite score + Markdown report |
-| 7 | **Publish** | Leaderboard row upserted; job marked `SUCCEEDED` with its result payload |
-
-Because job state lives in the database, progress survives an API restart and any number of workers can scale independently. Full detail in [docs/architecture.md](docs/architecture.md).
-
-</details>
-
-<details>
-<summary><b>📂 Repository layout</b></summary>
-
-| Path | Contents |
+| Layer | Responsibility |
 | --- | --- |
-| [src/vla_eval/core/](src/vla_eval/core) | Settings, structured logging, exceptions |
-| [src/vla_eval/data/](src/vla_eval/data) | Dataset registry, download, transforms, preprocessing |
-| [src/vla_eval/models/](src/vla_eval/models) | Model interface + baseline / OpenVLA / LeRobot |
-| [src/vla_eval/training/](src/vla_eval/training) | Trainer, LoRA, callbacks, MLflow integration |
-| [src/vla_eval/evaluation/](src/vla_eval/evaluation) | Benchmarks, metrics, leaderboard, reports |
-| [src/vla_eval/api/](src/vla_eval/api) | FastAPI app, routers, DB models, services, security |
-| [src/vla_eval/cli/](src/vla_eval/cli) | Typer CLI entrypoint |
-| [configs/](configs) | Hydra configs (dataset / model / training / evaluation) |
-| [scripts/](scripts) | Hydra entry points for training & evaluation |
-| [frontend/](frontend) | React + Vite + TypeScript dashboard |
-| [tests/](tests) | Unit + integration tests (pytest) |
-| [docker/](docker) | Per-service Dockerfiles + supporting configs |
-| [deploy/k8s/](deploy/k8s) | Kustomize base + staging/production overlays |
-| [migrations/](migrations) | Alembic database migrations |
-| [.github/](.github) | CI/CD workflows, issue/PR templates, Dependabot |
+| Data plane | Locate datasets, download/cache them, standardize observations and preserve action statistics |
+| Policy plane | Present different robotics policies through `predict`, `reset`, lifecycle and persistence methods |
+| Training plane | Train the supported baseline without coupling it to the API or dashboard |
+| Evaluation plane | Produce comparable evidence from predictions, latency and optional rollout success |
+| Control plane | Validate requests, persist job state, coordinate execution and publish leaderboard records |
+| Experience plane | Let users browse datasets, submit work, monitor jobs and inspect rankings |
+| Operations plane | Track experiments, expose telemetry, package services and validate deployment manifests |
 
-</details>
+See [docs/architecture.md](docs/architecture.md) for module-level details.
 
+## End-to-end workflows
 
-## Datasets & Models
+### 1. Dataset preparation
 
-### Where the data comes from
-
-All datasets are **real, publicly available robot-learning datasets downloaded at runtime from the [Hugging Face Hub](https://huggingface.co/), under the [`lerobot`](https://huggingface.co/lerobot) organization** — the standardized dataset collection maintained by the Hugging Face [LeRobot](https://github.com/huggingface/lerobot) project. They contain synchronized camera frames, proprioceptive state, and action trajectories recorded on physical robots and in simulators.
-
-- **Source of truth:** `https://huggingface.co/datasets/lerobot/<name>`
-- **No data is vendored in this repository** — nothing is committed to git. Datasets are fetched on demand into `./data/cache/` (override with `--cache-dir`).
-- **Not sourced from Kaggle**, scraped websites, or ad-hoc CSV dumps.
-- Several entries originate from the [Open X-Embodiment](https://robotics-transformer-x.github.io/) collection (BridgeData V2, Berkeley AUTOLAB UR5), re-published in LeRobot format.
-- The registry lives in [src/vla_eval/data/registry.py](src/vla_eval/data/registry.py); download logic in [src/vla_eval/data/datasets.py](src/vla_eval/data/datasets.py).
-
-| Registry name | Hub repo | Robot / task | Action dim | Type | License |
-| --- | --- | --- | :--: | :--: | :--: |
-| `pusht` | [`lerobot/pusht`](https://huggingface.co/datasets/lerobot/pusht) | Push a T-block to a target pose | 2 | ![sim](https://img.shields.io/badge/sim-4FC3F7) | MIT |
-| `aloha_sim_insertion_human` | [`lerobot/aloha_sim_insertion_human`](https://huggingface.co/datasets/lerobot/aloha_sim_insertion_human) | ALOHA bimanual peg insertion | 14 | ![sim](https://img.shields.io/badge/sim-4FC3F7) | MIT |
-| `aloha_sim_transfer_cube_human` | [`lerobot/aloha_sim_transfer_cube_human`](https://huggingface.co/datasets/lerobot/aloha_sim_transfer_cube_human) | ALOHA bimanual cube transfer | 14 | ![sim](https://img.shields.io/badge/sim-4FC3F7) | MIT |
-| `xarm_lift_medium` | [`lerobot/xarm_lift_medium`](https://huggingface.co/datasets/lerobot/xarm_lift_medium) | xArm lifting (medium difficulty) | 4 | ![sim](https://img.shields.io/badge/sim-4FC3F7) | MIT |
-| `berkeley_autolab_ur5` | [`lerobot/berkeley_autolab_ur5`](https://huggingface.co/datasets/lerobot/berkeley_autolab_ur5) | UR5 tabletop manipulation | 7 | ![real](https://img.shields.io/badge/real%20robot-2EA043) | CC-BY-4.0 |
-| `bridge_orig` | [`lerobot/bridge_orig`](https://huggingface.co/datasets/lerobot/bridge_orig) | BridgeData V2, multi-kitchen manipulation | 7 | ![real](https://img.shields.io/badge/real%20robot-2EA043) | CC-BY-4.0 |
-| `synthetic` | _(generated in-process)_ | Deterministic fixture for CI / offline runs | 7 | ![synthetic](https://img.shields.io/badge/synthetic-9E9E9E) | — |
-
-Downloads go through `lerobot` when installed, falling back to a `huggingface_hub` snapshot download otherwise — both support **revision pinning** (`revision=` / commit SHA) for reproducibility. Gated or private repos need `HF_TOKEN` set in your `.env`. Add your own datasets with a single `register_dataset(DatasetSpec(...))` call; no other code changes needed.
-
-### Models
-
-| Model key | Backbone | Notes |
-| --- | --- | --- |
-| `baseline-cnn` | CNN encoder + MLP head | CPU-friendly reference policy; used by tests and smoke runs |
-| `openvla` | [OpenVLA-7B](https://huggingface.co/openvla/openvla-7b) | 4-bit quantization + LoRA fine-tuning; needs a CUDA GPU |
-| `lerobot-act` | LeRobot ACT | Action-chunking transformer |
-| `lerobot-diffusion` | LeRobot Diffusion Policy | Diffusion-based visuomotor policy |
-
-Model weights are likewise pulled from the Hugging Face Hub on first use and cached under `HF_HOME` — none are committed to this repository.
-
-```bash
-vla-eval data list      # print the live registry as a table
+```text
+Registry name
+  → Hugging Face/LeRobot repository metadata
+  → revision-aware download and local cache
+  → image/state/action extraction
+  → resize + CHW float conversion
+  → action statistics
+  → VLAEpisodeDataset
 ```
 
-## Quickstart
+The repository stores metadata and code, not third-party dataset payloads or model weights.
 
-### Docker Compose (recommended)
+### 2. Tested baseline training path
 
-Brings up Postgres, Redis, MLflow, the API, the background worker, the frontend, Prometheus, and Grafana.
+```text
+VLAEpisodeDataset
+  → deterministic train/validation split
+  → CNN image encoder + state encoder + action head
+  → behavior-cloning MSE objective
+  → AdamW + OneCycleLR + gradient clipping
+  → early stopping + best/final checkpoints
+  → MLflow parameters and epoch metrics
+```
+
+### 3. Evaluation and publication
+
+```text
+Policy + evaluation dataset
+  → per-sample action prediction
+  → action error + latency measurements
+  → composite score
+  → Markdown report + chart
+  → database leaderboard entry (API workflow)
+```
+
+### 4. API job lifecycle
+
+| State | Meaning |
+| --- | --- |
+| `PENDING` | Request is validated and stored |
+| `RUNNING` | An executor has claimed the job |
+| `SUCCEEDED` | Result metadata is persisted and available to the UI |
+| `FAILED` | A captured error is stored for diagnosis |
+| `CANCELLED` | Reserved lifecycle state for future cancellation support |
+
+## Datasets
+
+VLA-Eval registers public robot-learning datasets distributed through the Hugging Face **LeRobot** collection. The catalog includes simulated benchmarks and physical-robot demonstrations.
+
+| Registry key | Hub repository | Task | Action dim | Source type | License metadata |
+| --- | --- | --- | :---: | :---: | :---: |
+| `pusht` | `lerobot/pusht` | Push a T-block to a target pose | 2 | Simulation | MIT |
+| `aloha_sim_insertion_human` | `lerobot/aloha_sim_insertion_human` | Bimanual peg insertion | 14 | Simulation | MIT |
+| `aloha_sim_transfer_cube_human` | `lerobot/aloha_sim_transfer_cube_human` | Bimanual cube transfer | 14 | Simulation | MIT |
+| `xarm_lift_medium` | `lerobot/xarm_lift_medium` | xArm lifting | 4 | Simulation | MIT |
+| `berkeley_autolab_ur5` | `lerobot/berkeley_autolab_ur5` | UR5 tabletop manipulation | 7 | Physical robot | CC-BY-4.0 |
+| `bridge_orig` | `lerobot/bridge_orig` | BridgeData V2 manipulation | 7 | Physical robot | CC-BY-4.0 |
+| `synthetic` | Generated in process | Deterministic engineering fixture | 7 default | Synthetic | Not applicable |
+
+Important data rules:
+
+- The synthetic dataset verifies software flow; its random targets do **not** constitute robotics performance evidence.
+- Real dataset preprocessing requires the optional LeRobot dependency.
+- Large datasets can require hundreds of gigabytes. Limit preprocessing with `--max-episodes` during exploration.
+- Hub revisions can be pinned through the programmatic downloader for reproducible acquisition.
+- Dataset license metadata is recorded, but users remain responsible for verifying upstream terms before redistribution or commercial use.
+
+## Policies and training support
+
+All policy adapters implement the same prediction contract, but they do not yet share one universal training objective.
+
+| Model key | Architecture | Load / inference | Generic trainer | Intended role |
+| --- | --- | :---: | :---: | --- |
+| `baseline-cnn` | CNN image encoder + state MLP + action head | ✅ | ✅ | CPU-friendly reference and complete smoke path |
+| `openvla` | OpenVLA-7B vision-language-action model | ✅ adapter | Not yet | GPU evaluation and future parameter-efficient fine-tuning integration |
+| `lerobot-act` | Action Chunking Transformer | ✅ adapter | Not yet | Chunked-policy integration point |
+| `lerobot-diffusion` | Diffusion Policy | ✅ adapter | Not yet | Diffusion-policy integration point |
+
+The repository contains LoRA configuration helpers and an OpenVLA adapter capable of attaching PEFT adapters. Completing OpenVLA training requires an architecture-specific batch processor and loss path; completing ACT/Diffusion training requires their native sequence/chunk or diffusion objectives. The generic `Trainer` deliberately fails with a clear error when a model does not expose the baseline `.net` forward contract, preventing a false “successful” training run.
+
+## Evaluation contract
+
+### Open-loop benchmark
+
+For each recorded observation, the policy predicts an action that is compared with the demonstrator action.
+
+| Metric | Meaning |
+| --- | --- |
+| Action MSE | Mean squared error across samples and action dimensions |
+| Action MAE | Mean absolute action error |
+| Maximum error | Largest absolute error observed |
+| Per-dimension MSE | Identifies action coordinates with disproportionate error |
+| p50/p95/p99 latency | Inference-time distribution |
+| Throughput | Approximate single-sample in-process predictions per second |
+
+Open-loop error is deterministic and inexpensive, but it is a proxy. A policy can imitate recorded actions well and still fail after its own actions move the robot away from the demonstration trajectory.
+
+### Closed-loop extension
+
+`run_closed_loop_benchmark` accepts any simulator implementing:
+
+```python
+reset() -> Observation
+step(action) -> (Observation, reward, done, info)
+```
+
+It measures episode success and inference latency. The repository does not bundle LIBERO, SimplerEnv or ManiSkill adapters yet; therefore closed-loop success should be reported only after a concrete environment integration is added and validated.
+
+### Composite score
+
+The leaderboard score is intentionally simple and inspectable:
+
+```text
+accuracy = 1 / (1 + action_mse)
+speed    = min(1, 10 ms / mean_latency_ms)
+
+closed loop: 100 × (0.60 × success + 0.30 × accuracy + 0.10 × speed)
+open loop:   100 × (0.90 × accuracy + 0.10 × speed)
+```
+
+Scores are comparable only when the **dataset, action representation, preprocessing, sample count and hardware** are comparable. A global leaderboard rank across different tasks or action scales is a convenience view, not a scientific claim.
+
+## Quick start
+
+### Full local stack with Docker Compose
+
+Prerequisites: Docker with Compose and enough disk for the selected datasets/models.
 
 ```bash
-cp .env.example .env          # edit secrets/config as needed
+git clone --depth 1 https://github.com/haarikaalla/VLAEval.git
+cd VLAEval
+cp .env.example .env
+```
+
+Replace the development secrets in `.env`, then start the stack:
+
+```bash
 docker compose up -d --build
 ```
 
-- Frontend dashboard: http://localhost:8080
-- API docs (Swagger UI): http://localhost:8000/api/docs
-- MLflow UI: http://localhost:5000
-- Grafana: http://localhost:3000 (Prometheus datasource pre-provisioned)
+| Interface | URL |
+| --- | --- |
+| React dashboard | <http://localhost:8080> |
+| FastAPI Swagger UI | <http://localhost:8000/api/docs> |
+| MLflow | <http://localhost:5000> |
+| Prometheus | <http://localhost:9090> |
+| Grafana | <http://localhost:3000> |
 
-### Local development
-
-<details>
-<summary><b>Set up a local Python environment</b></summary>
-
-> **Note (Windows):** numpy 1.26.x has a known incompatibility with Python 3.13 on Windows (`OverflowError` during `numpy` import). Use `numpy>=2.1` (already the default constraint in `pyproject.toml`) or Python 3.11/3.12 if you hit this.
+### Network-free synthetic smoke run
 
 ```bash
-python -m venv .venv
-# Windows: .venv\Scripts\activate    |    macOS/Linux: source .venv/bin/activate
-
-# Install CPU-only torch first (much smaller/faster than the default CUDA wheel)
+python3.11 -m venv .venv
+source .venv/bin/activate                  # Windows: .venv\Scripts\activate
+python -m pip install --upgrade pip
 pip install torch --index-url https://download.pytorch.org/whl/cpu
-
 pip install -e ".[dev]"
-pre-commit install
 
-# Run the API (SQLite by default outside Docker; set DATABASE_URL to override)
-make run-api
-
-# In another shell: run the frontend
-cd frontend && npm install && npm run dev
-```
-
-</details>
-
-<details open>
-<summary><b>Try it in 60 seconds (no downloads required)</b></summary>
-
-The built-in `synthetic` dataset lets you exercise the full train → evaluate → report pipeline offline. Training/evaluation log to MLflow at `MLFLOW_TRACKING_URI` (defaults to `http://localhost:5000`); either run `mlflow server` locally, or point it at a local SQLite file for a zero-dependency run:
-
-```bash
-# macOS/Linux
 export MLFLOW_TRACKING_URI=sqlite:///./mlruns.db
-# Windows PowerShell
-$env:MLFLOW_TRACKING_URI="sqlite:///./mlruns.db"
-
-vla-eval data list                                       # 1. see the dataset registry
-vla-eval train --dataset synthetic --model baseline-cnn --epochs 1   # 2. train
-vla-eval evaluate --dataset synthetic --model baseline-cnn           # 3. benchmark + report
+vla-eval data list
+vla-eval train --dataset synthetic --model baseline-cnn --epochs 1
+vla-eval evaluate --dataset synthetic --model baseline-cnn --max-samples 32
 ```
 
-Step 3 writes a Markdown report with metrics and charts to `./reports/generated/`.
+The evaluation command writes a Markdown report and chart under `reports/generated/`.
 
-</details>
+### Real dataset workflow
 
-<details>
-<summary><b>Train on a real robotics dataset</b></summary>
+Install the optional LeRobot integration first:
 
 ```bash
-vla-eval data download pusht          # pulls lerobot/pusht from the HF Hub
-vla-eval data preprocess pusht
+pip install -e ".[lerobot]"
+vla-eval data download pusht
+vla-eval data preprocess pusht --max-episodes 100
 vla-eval train --dataset pusht --model baseline-cnn --epochs 20
-vla-eval evaluate --dataset pusht --model baseline-cnn
+vla-eval evaluate --dataset pusht --model baseline-cnn --max-samples 500
 ```
 
-For gated/private repos, set `HF_TOKEN` in your `.env`. Larger real-robot datasets (`bridge_orig`, `berkeley_autolab_ur5`) are hundreds of GB — use `--max-episodes` during preprocessing to work with a subset.
+Use an `HF_TOKEN` for gated/private repositories. Start with a subset before committing large storage or GPU time.
 
-</details>
-
-## CLI Usage
-
-The `vla-eval` console script (installed via `pip install -e .`) exposes:
+## CLI and configuration
 
 ```bash
-vla-eval data list                    # list registered public datasets
-vla-eval data download pusht          # download + cache a dataset
-vla-eval data preprocess pusht        # preprocess into training-ready format
-
-vla-eval train --dataset pusht --model baseline-cnn      # train/fine-tune a model
-vla-eval evaluate --dataset pusht --model baseline-cnn   # run the benchmark suite + report
-
-vla-eval serve                        # run the FastAPI backend (uvicorn)
+vla-eval data list
+vla-eval data download pusht
+vla-eval data preprocess pusht --max-episodes 100
+vla-eval train --dataset synthetic --model baseline-cnn --epochs 2
+vla-eval evaluate --dataset synthetic --model baseline-cnn
+vla-eval serve
 ```
 
-Every command supports `--help`. For full experiment-config control (sweeps, overrides), use the Hydra scripts directly:
+Every command supports `--help`.
+
+### Hydra experiments
+
+Hydra composes dataset, model, training and evaluation configuration from [`configs/`](configs):
 
 ```bash
-python scripts/train.py model=openvla_lora training=lora_finetune dataset=pusht
-python scripts/train.py -m training.learning_rate=1e-4,5e-5   # multirun sweep
-python scripts/evaluate.py model=baseline dataset=pusht
+python scripts/train.py dataset=synthetic model=baseline training.num_epochs=2
+python scripts/train.py -m dataset=synthetic model=baseline training.learning_rate=1e-4,5e-5
+python scripts/evaluate.py dataset=synthetic model=baseline evaluation.max_samples=32
 ```
 
-## API Usage
+The OpenVLA/LoRA and LeRobot configuration files are forward-looking integration presets; they should not be presented as completed native training paths until the corresponding trainer adapters are implemented.
 
-All endpoints are versioned under `/api/v1` and (except `/healthz`, `/readyz`, `/metrics`) require an `X-API-Key` header. Interactive OpenAPI docs live at **`/api/docs`** (Swagger) and **`/api/redoc`** (ReDoc) — the fastest way to explore and try requests in the browser.
+Runtime/service configuration is environment-driven through `pydantic-settings`. Experiment hyperparameters are kept separately in Hydra YAML, preventing service settings from being mixed with research configuration. See [.env.example](.env.example) and [docs/training-guide.md](docs/training-guide.md).
 
-<details open>
-<summary><b>📡 Endpoint map</b></summary>
+## API and dashboard
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/v1/datasets` | List the dataset registry |
-| `GET` | `/api/v1/datasets/{name}` | Dataset metadata |
-| `POST` | `/api/v1/datasets/{name}/download` | Kick off a background download |
-| `GET` | `/api/v1/models` | List available models |
-| `POST` | `/api/v1/training/jobs` | Submit a training job |
-| `GET` | `/api/v1/training/jobs/{id}` | Poll job status |
-| `POST` | `/api/v1/evaluation/jobs` | Submit an evaluation job |
-| `GET` | `/api/v1/leaderboard` | Ranked results |
-| `POST` | `/api/v1/auth/token` | Exchange an API key for a JWT |
-| `GET` | `/healthz` · `/readyz` · `/metrics` | Health probes & Prometheus |
+All application endpoints use `/api/v1`. OpenAPI is available at `/api/docs` and `/api/redoc`.
 
-</details>
+| Method | Path | Authentication | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/healthz`, `/readyz`, `/metrics` | Public | Liveness, dependency readiness and telemetry |
+| `GET` | `/api/v1/datasets`, `/models`, `/leaderboard` | Public | Discovery and published results |
+| `POST` | `/api/v1/datasets/download` | API key | Start a dataset download |
+| `POST` | `/api/v1/training/jobs` | API key | Submit baseline training work |
+| `GET` | `/api/v1/training/jobs[/{id}]` | Public currently | Inspect training job state |
+| `POST` | `/api/v1/evaluation/jobs` | API key | Submit evaluation work |
+| `GET` | `/api/v1/evaluation/jobs[/{id}]` | Public currently | Inspect evaluation job state |
+| `POST` | `/api/v1/auth/token` | API key | Issue a short-lived JWT |
 
-<details>
-<summary><b>💻 curl examples</b></summary>
+Example:
 
 ```bash
-export API_KEY=dev-local-api-key-change-me   # from your .env
+export API_KEY='replace-with-the-value-from-your-env'
 
-# List datasets
-curl -H "X-API-Key: $API_KEY" http://localhost:8000/api/v1/datasets
-
-# Submit a training job
-curl -X POST -H "X-API-Key: $API_KEY" -H "Content-Type: application/json" \
-  -d '{"dataset_name": "pusht", "model_name": "baseline-cnn", "num_epochs": 10}' \
-  http://localhost:8000/api/v1/training/jobs
-
-# Poll job status
-curl -H "X-API-Key: $API_KEY" http://localhost:8000/api/v1/training/jobs/<job_id>
-
-# Leaderboard
-curl -H "X-API-Key: $API_KEY" http://localhost:8000/api/v1/leaderboard
+curl -X POST http://localhost:8000/api/v1/evaluation/jobs \
+  -H "X-API-Key: ${API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"model_name":"baseline-cnn","dataset_name":"synthetic","device":"cpu","max_samples":32}'
 ```
 
-</details>
+The React dashboard provides four connected views:
 
-## Configuration
+1. **Leaderboard** — ranked results, task filtering and a score chart.
+2. **Datasets** — registry metadata, source, task type, action dimension and license.
+3. **Training Jobs** — validated job submission and live status polling.
+4. **Evaluation Jobs** — benchmark submission, status and composite-score results.
 
-All runtime settings are environment-variable driven via `pydantic-settings` (`vla_eval.core.config.Settings`). See [.env.example](.env.example) for the full list (app/API settings, database URL, MLflow tracking URI, Hugging Face token, S3/object storage, Redis, training defaults, frontend base URL).
+The development frontend can store an API key in browser local storage. The JWT issuer/verifier is present, but the frontend does not yet complete a bearer-token login flow; production deployments should finish that integration and add role-based authorization.
 
-Experiment configuration (datasets/models/training/evaluation hyperparameters) is composed via Hydra from [configs/config.yaml](configs/config.yaml) and the `configs/{dataset,model,training,evaluation}/` groups — see [docs/training-guide.md](docs/training-guide.md).
+## Experiment tracking and operations
 
-## Testing
+### MLflow
 
-Every check below runs in CI on each push and pull request.
+The trainer records:
 
-| Check | Command | Status |
-| --- | --- | :--: |
-| Unit + integration tests | `pytest` | ![31 passing](https://img.shields.io/badge/31%20passing-2EA043) |
-| Coverage | `pytest --cov=vla_eval --cov-report=term-missing` | ![tracked](https://img.shields.io/badge/tracked-1F6FEB) |
-| Lint | `ruff check src tests` | ![clean](https://img.shields.io/badge/clean-2EA043) |
-| Format | `black --check src tests` | ![clean](https://img.shields.io/badge/clean-2EA043) |
-| Types | `mypy src` | ![0 errors](https://img.shields.io/badge/0%20errors-2EA043) |
-| Security | `bandit -c pyproject.toml -r src` | ![0 issues](https://img.shields.io/badge/0%20issues-2EA043) |
-| Frontend | `cd frontend && npm test` | ![passing](https://img.shields.io/badge/passing-2EA043) |
+- run name and experiment;
+- model, dataset and split sizes;
+- epoch-level training/validation loss;
+- epoch duration and training parameters.
 
-Or run everything at once with `make check`.
+Checkpoints and generated reports are written to configured artifact directories/volumes. Uploading those files as MLflow artifacts is a clear next integration step; the current code should not be described as already doing so.
+
+### Observability
+
+- Structured application and HTTP logs
+- Caller-supplied or generated `X-Request-ID`
+- Prometheus FastAPI instrumentation at `/metrics`
+- Liveness and database-backed readiness endpoints
+- Grafana datasource and API overview dashboard provisioning
+- Container health checks and restart policies
+
+### Persistence
+
+- PostgreSQL stores job and leaderboard records in Compose/Kubernetes.
+- SQLite provides a zero-service local-development option.
+- Named volumes preserve PostgreSQL, MLflow, dataset, checkpoint and report data in Compose.
+- Alembic migrations provide an explicit production schema path.
+
+## Testing, security and delivery
+
+Run the local quality gate:
+
+```bash
+make check
+cd frontend && npm test && npm run build
+```
+
+The 31 Python unit/integration tests cover dataset registration, preprocessing, metrics, ranking, baseline prediction/checkpointing, training, authentication, health/readiness and the API train → evaluate → leaderboard path. Frontend tests cover reusable UI behavior.
+
+GitHub automation validates:
+
+- Python 3.10, 3.11 and 3.12 tests with coverage;
+- Ruff, Black and mypy;
+- React lint, type checking, production build and Vitest;
+- API, worker, frontend and MLflow container builds;
+- staging and production Kustomize rendering and image-name consistency;
+- CodeQL, gitleaks, Bandit, dependency review and Trivy scans;
+- nightly synthetic benchmark report generation;
+- GHCR image publication and manual, environment-gated Kubernetes deployment.
+
+Dependency-audit and container-vulnerability findings are currently informational in parts of the workflows (`pip-audit` and Trivy do not block delivery). This is intentional visibility, not a claim of zero vulnerabilities.
 
 ## Deployment
 
-| Target | How | Guide |
+| Target | Command / workflow | Purpose |
 | --- | --- | --- |
-| 🐳 **Docker Compose** | `docker compose up -d --build` | [docs/deployment.md](docs/deployment.md) |
-| ☸️ **Kubernetes (staging)** | `kubectl apply -k deploy/k8s/overlays/staging` | [docs/deployment.md](docs/deployment.md) |
-| ☸️ **Kubernetes (production)** | `kubectl apply -k deploy/k8s/overlays/production` | [docs/deployment.md](docs/deployment.md) |
+| Local integration | `docker compose up -d --build` | Complete service stack |
+| Staging manifests | `kubectl apply -k deploy/k8s/overlays/staging` | Lower replicas and staging configuration |
+| Production manifests | `kubectl apply -k deploy/k8s/overlays/production` | Production configuration baseline |
+| Image delivery | `.github/workflows/cd.yml` | Build and publish commit-pinned GHCR images |
+| Cluster rollout | Manual `Deploy` workflow | Requires configured `KUBE_CONFIG` and environment approval |
+
+Kubernetes files are deployable templates, not evidence of an active public cluster. Operators must supply secrets, storage classes, ingress/DNS/TLS and capacity appropriate for their GPU/CPU workloads.
+
+## Known boundaries and roadmap
+
+An advanced project is credible when its limitations are explicit. The highest-value next steps are:
+
+1. **Architecture-specific trainers:** integrate OpenVLA token/action losses, ACT action-chunking losses and Diffusion Policy objectives.
+2. **Episode-safe splitting:** replace the current sample-level random split with episode/task/environment partitions to prevent correlated-frame leakage.
+3. **Action normalization in training:** apply saved normalization statistics consistently and record the action representation in benchmark metadata.
+4. **Concrete closed-loop adapters:** add LIBERO, SimplerEnv or ManiSkill environments and report confidence intervals across seeds/tasks.
+5. **Fair leaderboard contracts:** partition rankings by dataset revision, preprocessing contract, checkpoint, hardware and evaluation mode.
+6. **Unified job ownership:** choose one production execution path and move queueing to Redis/RQ, Celery or another explicit broker before scaling API/worker replicas.
+7. **Complete identity flow:** use short-lived JWTs in the frontend, protect job metadata and add roles/ownership/audit events.
+8. **Active platform controls:** implement rate limiting and object-storage integration instead of exposing configuration placeholders only.
+9. **Artifact lineage:** attach checkpoint/report URIs and dataset revisions to MLflow runs and leaderboard entries.
+10. **Stronger release gates:** make dependency and container vulnerability policies blocking at an agreed severity threshold.
+
+Scientific interpretation boundaries:
+
+- Synthetic results validate engineering, not robot capability.
+- Open-loop action similarity does not prove closed-loop task success or safety.
+- A single composite score hides tradeoffs and must be accompanied by component metrics.
+- Latency comparisons require the same hardware, precision, batch size and warm-up protocol.
+- Physical-robot deployment requires independent safety controls, workspace constraints, emergency stops and human supervision outside this software.
+
+## Repository map
+
+```text
+.
+├── src/vla_eval/
+│   ├── api/                 # FastAPI, persistence, auth and background jobs
+│   ├── cli/                 # Typer command-line interface
+│   ├── core/                # settings, logging and domain exceptions
+│   ├── data/                # registry, Hub downloads and preprocessing
+│   ├── evaluation/          # metrics, benchmarks, reports and ranking
+│   ├── models/              # baseline, OpenVLA and LeRobot adapters
+│   ├── training/            # baseline trainer, callbacks, LoRA and MLflow helpers
+│   └── utils/               # device, I/O and reproducibility helpers
+├── frontend/                # React + TypeScript operations dashboard
+├── configs/                 # Hydra experiment composition
+├── scripts/                 # Hydra training/evaluation entry points
+├── tests/                   # Python unit and integration tests
+├── migrations/              # Alembic schema versions
+├── docker/                  # service-specific Dockerfiles and observability config
+├── deploy/k8s/              # Kustomize base, staging and production overlays
+├── docs/                    # architecture, API, training and deployment guides
+└── .github/workflows/       # CI, security, nightly benchmark, image CD and deploy
+```
+
+## A concise reviewer walkthrough
+
+For a five-minute demonstration:
+
+1. Start with the [capability map](#capability-and-maturity-map) to establish honest scope.
+2. Explain the control-plane/execution-plane separation in the [architecture](#system-architecture).
+3. Run the synthetic baseline path to prove reproducibility without external data or a GPU.
+4. Show the generated report, persisted job state, leaderboard and MLflow metrics.
+5. Explain why open-loop MSE is useful but insufficient for robotics success.
+6. Finish with the roadmap from baseline infrastructure to real closed-loop VLA evaluation.
 
 ## Documentation
 
-| Doc | Covers |
+| Document | Focus |
 | --- | --- |
-| 🏗️ [docs/architecture.md](docs/architecture.md) | System design, module responsibilities, data flow |
-| 🎓 [docs/training-guide.md](docs/training-guide.md) | Datasets, model configs, LoRA fine-tuning, MLflow |
-| 🔌 [docs/api-reference.md](docs/api-reference.md) | REST API endpoints and authentication |
-| 🚀 [docs/deployment.md](docs/deployment.md) | Docker Compose and Kubernetes deployment |
-| 🤝 [CONTRIBUTING.md](CONTRIBUTING.md) | Development workflow and code style |
-| 🔒 [SECURITY.md](SECURITY.md) | Vulnerability reporting and security practices |
-
-## Contributing
-
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, coding standards, and pull request process.
-
-## Security
-
-See [SECURITY.md](SECURITY.md) for the vulnerability disclosure policy and an overview of the security controls used throughout the platform (secret handling, safe model deserialization, auth, dependency/image scanning).
+| [Architecture](docs/architecture.md) | Module responsibilities and data flow |
+| [Training guide](docs/training-guide.md) | Datasets, configs, LoRA concepts and MLflow |
+| [API reference](docs/api-reference.md) | Endpoints and request/response contracts |
+| [Deployment guide](docs/deployment.md) | Compose and Kubernetes operations |
+| [Contributing](CONTRIBUTING.md) | Development workflow and standards |
+| [Security](SECURITY.md) | Disclosure policy and security design |
 
 ## License
 
@@ -402,8 +542,6 @@ Licensed under the [Apache License 2.0](LICENSE).
 
 <div align="center">
 
-Built with 🤗 [LeRobot](https://github.com/huggingface/lerobot) datasets · [OpenVLA](https://openvla.github.io/) · [PyTorch](https://pytorch.org/) · [FastAPI](https://fastapi.tiangolo.com/) · [MLflow](https://mlflow.org/)
-
-⭐ **Star this repo** if it helps your robot-learning work.
+Built around PyTorch, Hugging Face/LeRobot, FastAPI, React, MLflow and Kubernetes—with explicit boundaries between tested capability and future integration.
 
 </div>
