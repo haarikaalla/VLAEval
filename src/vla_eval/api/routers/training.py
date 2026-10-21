@@ -6,7 +6,7 @@ import json
 
 from fastapi import APIRouter, HTTPException, status
 
-from vla_eval.api.dependencies import ApiKeyAuth, DbSession
+from vla_eval.api.dependencies import DbSession, WriteAuth
 from vla_eval.api.models_db import Job, JobType
 from vla_eval.api.schemas import JobResponse, TrainingRequest
 from vla_eval.api.services.job_manager import submit_training_job
@@ -35,14 +35,14 @@ def _to_job_response(job: Job) -> JobResponse:
     summary="Submit a training job",
 )
 def create_training_job(
-    request: TrainingRequest, db: DbSession, api_key: ApiKeyAuth
+    request: TrainingRequest, db: DbSession, principal: WriteAuth
 ) -> JobResponse:
-    job = submit_training_job(db, request)
+    job = submit_training_job(db, request, created_by=principal.subject)
     return _to_job_response(job)
 
 
 @router.get("/jobs/{job_id}", response_model=JobResponse, summary="Get training job status")
-def get_training_job(job_id: str, db: DbSession) -> JobResponse:
+def get_training_job(job_id: str, db: DbSession, principal: WriteAuth) -> JobResponse:
     job = db.query(Job).filter(Job.id == job_id, Job.job_type == JobType.TRAINING).first()
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Training job not found.")
@@ -50,7 +50,7 @@ def get_training_job(job_id: str, db: DbSession) -> JobResponse:
 
 
 @router.get("/jobs", response_model=list[JobResponse], summary="List training jobs")
-def list_training_jobs(db: DbSession, limit: int = 50) -> list[JobResponse]:
+def list_training_jobs(db: DbSession, principal: WriteAuth, limit: int = 50) -> list[JobResponse]:
     jobs = (
         db.query(Job)
         .filter(Job.job_type == JobType.TRAINING)

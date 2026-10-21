@@ -7,7 +7,7 @@
 [![CI](https://github.com/haarikaalla/VLAEval/actions/workflows/ci.yml/badge.svg)](https://github.com/haarikaalla/VLAEval/actions/workflows/ci.yml)
 [![Security](https://github.com/haarikaalla/VLAEval/actions/workflows/security.yml/badge.svg)](https://github.com/haarikaalla/VLAEval/actions/workflows/security.yml)
 [![Nightly benchmark](https://github.com/haarikaalla/VLAEval/actions/workflows/nightly-benchmark.yml/badge.svg)](https://github.com/haarikaalla/VLAEval/actions/workflows/nightly-benchmark.yml)
-![Tests](https://img.shields.io/badge/tests-31-2EA043?logo=pytest&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-automated-2EA043?logo=pytest&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.10--3.12%20CI-3776AB?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-policy%20runtime-EE4C2C?logo=pytorch&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-control%20plane-009688?logo=fastapi&logoColor=white)
@@ -76,9 +76,9 @@ This table is the fastest way to understand what is complete today.
 | Hugging Face acquisition | ✅ Complete | LeRobot-native loader with Hub snapshot fallback and programmatic revision pinning |
 | OpenVLA adapter | 🟡 Adapter | Lazy loading, quantization configuration, LoRA attachment and inference interface; native fine-tuning loop remains future work |
 | LeRobot ACT/Diffusion adapters | 🟡 Adapter | Lazy policy loading and inference interface; native action-chunking/diffusion training remains future work |
-| Closed-loop evaluation | 🟡 Extension | Generic rollout protocol and benchmark exist; no concrete simulator adapter is bundled |
-| Distributed jobs | 🟡 Foundation | Persistent SQL jobs and worker claiming exist; production queue ownership should be unified before horizontal scale |
-| JWT browser authentication | 🟡 Foundation | Token issuance/verification exists; current write endpoints enforce the API-key dependency |
+| Closed-loop evaluation | ✅ Synthetic | Concrete deterministic reach environment exercises observations, actions, termination, success rate and latency; robotics simulators remain adapters |
+| Distributed jobs | ✅ Complete | Durable SQL jobs, atomic Postgres claiming and explicit `inline`/`worker` ownership prevent API/worker races |
+| JWT browser authentication | ✅ Complete | Dashboard exchanges the API key once, stores a short-lived JWT and uses bearer auth for protected job operations |
 | Redis, S3 and rate limits | ⚪ Planned | Configuration placeholders exist, but they are not active runtime dependencies in the current execution path |
 
 Legend: ✅ complete and exercised · 🟡 implemented foundation or adapter with an explicit integration boundary · ⚪ planned contract, not active behavior.
@@ -256,7 +256,7 @@ For each recorded observation, the policy predicts an action that is compared wi
 
 Open-loop error is deterministic and inexpensive, but it is a proxy. A policy can imitate recorded actions well and still fail after its own actions move the robot away from the demonstration trajectory.
 
-### Closed-loop extension
+### Closed-loop evaluation
 
 `run_closed_loop_benchmark` accepts any simulator implementing:
 
@@ -265,7 +265,7 @@ reset() -> Observation
 step(action) -> (Observation, reward, done, info)
 ```
 
-It measures episode success and inference latency. The repository does not bundle LIBERO, SimplerEnv or ManiSkill adapters yet; therefore closed-loop success should be reported only after a concrete environment integration is added and validated.
+It measures episode success and inference latency. `SyntheticReachEnv` is a deterministic, network-free implementation used to validate the complete rollout and reporting path. Select **Closed-loop simulator** in the Evaluation Jobs dashboard to choose episode count, maximum steps and action dimensions. This synthetic task is engineering evidence, not a robotics-performance claim: LIBERO, SimplerEnv, ManiSkill or physical-robot results still require their own validated adapter and safety protocol.
 
 ### Composite score
 
@@ -373,12 +373,14 @@ All application endpoints use `/api/v1`. OpenAPI is available at `/api/docs` and
 | --- | --- | --- | --- |
 | `GET` | `/healthz`, `/readyz`, `/metrics` | Public | Liveness, dependency readiness and telemetry |
 | `GET` | `/api/v1/datasets`, `/models`, `/leaderboard` | Public | Discovery and published results |
-| `POST` | `/api/v1/datasets/download` | API key | Start a dataset download |
-| `POST` | `/api/v1/training/jobs` | API key | Submit baseline training work |
-| `GET` | `/api/v1/training/jobs[/{id}]` | Public currently | Inspect training job state |
-| `POST` | `/api/v1/evaluation/jobs` | API key | Submit evaluation work |
-| `GET` | `/api/v1/evaluation/jobs[/{id}]` | Public currently | Inspect evaluation job state |
+| `POST` | `/api/v1/datasets/download` | API key or JWT | Start a dataset download |
+| `POST` | `/api/v1/training/jobs` | API key or JWT | Submit baseline training work |
+| `GET` | `/api/v1/training/jobs[/{id}]` | API key or JWT | Inspect training job state |
+| `POST` | `/api/v1/evaluation/jobs` | API key or JWT | Submit open- or closed-loop evaluation work |
+| `GET` | `/api/v1/evaluation/jobs[/{id}]` | API key or JWT | Inspect evaluation job state |
+| `GET` | `/api/v1/evaluation/jobs/{id}/report` | API key or JWT | Download the generated Markdown report |
 | `POST` | `/api/v1/auth/token` | API key | Issue a short-lived JWT |
+| `GET` | `/api/v1/auth/me` | API key or JWT | Inspect the authenticated caller |
 
 Example:
 
@@ -396,9 +398,9 @@ The React dashboard provides four connected views:
 1. **Leaderboard** — ranked results, task filtering and a score chart.
 2. **Datasets** — registry metadata, source, task type, action dimension and license.
 3. **Training Jobs** — validated job submission and live status polling.
-4. **Evaluation Jobs** — benchmark submission, status and composite-score results.
+4. **Evaluation Jobs** — open/closed-loop submission, status, composite-score results and authenticated report downloads.
 
-The development frontend can store an API key in browser local storage. The JWT issuer/verifier is present, but the frontend does not yet complete a bearer-token login flow; production deployments should finish that integration and add role-based authorization.
+Use the dashboard header to sign in. The API key is sent only to the token-exchange endpoint and is not persisted by the browser; the returned short-lived JWT is used for training, evaluation, dataset-download and job-status requests. The token carries an operator role and the API records the submitting identity. Multi-user identity providers and fine-grained per-project permissions remain deployment-specific extensions.
 
 ## Experiment tracking and operations
 
@@ -438,7 +440,7 @@ make check
 cd frontend && npm test && npm run build
 ```
 
-The 31 Python unit/integration tests cover dataset registration, preprocessing, metrics, ranking, baseline prediction/checkpointing, training, authentication, health/readiness and the API train → evaluate → leaderboard path. Frontend tests cover reusable UI behavior.
+The Python unit/integration suite covers dataset registration, preprocessing, metrics, ranking, baseline prediction/checkpointing, synthetic closed-loop rollouts, training, JWT authentication, health/readiness and the API train → evaluate → leaderboard path. Frontend tests cover reusable UI behavior, and the production dashboard must pass lint plus a TypeScript build.
 
 GitHub automation validates:
 
@@ -461,7 +463,7 @@ Dependency-audit and container-vulnerability findings are currently informationa
 | Staging manifests | `kubectl apply -k deploy/k8s/overlays/staging` | Lower replicas and staging configuration |
 | Production manifests | `kubectl apply -k deploy/k8s/overlays/production` | Production configuration baseline |
 | Image delivery | `.github/workflows/cd.yml` | Build and publish commit-pinned GHCR images |
-| Cluster rollout | Manual `Deploy` workflow | Requires configured `KUBE_CONFIG` and environment approval |
+| Cluster rollout | Manual `Deploy` workflow | Requires cluster/application secrets, environment approval, rollout checks and an in-cluster API smoke test |
 
 Kubernetes files are deployable templates, not evidence of an active public cluster. Operators must supply secrets, storage classes, ingress/DNS/TLS and capacity appropriate for their GPU/CPU workloads.
 
@@ -472,10 +474,10 @@ An advanced project is credible when its limitations are explicit. The highest-v
 1. **Architecture-specific trainers:** integrate OpenVLA token/action losses, ACT action-chunking losses and Diffusion Policy objectives.
 2. **Episode-safe splitting:** replace the current sample-level random split with episode/task/environment partitions to prevent correlated-frame leakage.
 3. **Action normalization in training:** apply saved normalization statistics consistently and record the action representation in benchmark metadata.
-4. **Concrete closed-loop adapters:** add LIBERO, SimplerEnv or ManiSkill environments and report confidence intervals across seeds/tasks.
+4. **Robotics closed-loop adapters:** extend the working synthetic rollout path with LIBERO, SimplerEnv or ManiSkill and report confidence intervals across seeds/tasks.
 5. **Fair leaderboard contracts:** partition rankings by dataset revision, preprocessing contract, checkpoint, hardware and evaluation mode.
-6. **Unified job ownership:** choose one production execution path and move queueing to Redis/RQ, Celery or another explicit broker before scaling API/worker replicas.
-7. **Complete identity flow:** use short-lived JWTs in the frontend, protect job metadata and add roles/ownership/audit events.
+6. **Broker-backed scheduling:** replace SQL polling with Redis/RQ, Celery or another explicit broker when queue volume needs priorities, retries and autoscaling signals.
+7. **Enterprise identity:** connect an OIDC provider and extend the working JWT operator flow with per-project roles and audit events.
 8. **Active platform controls:** implement rate limiting and object-storage integration instead of exposing configuration placeholders only.
 9. **Artifact lineage:** attach checkpoint/report URIs and dataset revisions to MLflow runs and leaderboard entries.
 10. **Stronger release gates:** make dependency and container vulnerability policies blocking at an agreed severity threshold.

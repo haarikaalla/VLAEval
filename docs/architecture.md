@@ -63,9 +63,9 @@ graph TD
 
 1. Client (UI/CLI/API caller) submits a training request → `POST /api/v1/training/jobs`.
 2. `job_manager.submit_training_job` inserts a `Job` row (`status=pending`) and returns immediately.
-3. The background worker (`vla_eval.api.services.background_worker`, run via `make run-worker` or the `worker` container) polls for pending jobs (`claim_pending_job`, using `SELECT ... FOR UPDATE SKIP LOCKED` on Postgres, or a plain claim on SQLite).
-4. The worker executes the job on a `ThreadPoolExecutor`, calling into `vla_eval.training.trainer.Trainer.fit`, which wraps the run in an MLflow run context, trains, checkpoints, and updates the `Job` row with progress/result.
-5. Evaluation jobs follow the same pattern via `run_offline_benchmark`/`run_closed_loop_benchmark`, writing a `LeaderboardEntryDB` row on completion.
+3. `JOB_EXECUTION_MODE` selects exactly one owner: `inline` submits to a bounded API `ThreadPoolExecutor` for local development; `worker` leaves the durable row pending for the standalone worker used by Compose/Kubernetes.
+4. The worker polls pending jobs (`claim_pending_job`, using `SELECT ... FOR UPDATE SKIP LOCKED` on Postgres, plus a conditional update) and directly calls `Trainer.fit`, which wraps the run in an MLflow context, trains, checkpoints and updates the job result.
+5. Evaluation jobs follow the same pattern via dataset-based `run_offline_benchmark` or the concrete `SyntheticReachEnv` closed-loop path, writing a `LeaderboardEntryDB` row on completion.
 6. The dashboard and `/api/v1/leaderboard` read from the `leaderboard_entries` table.
 
 ## Why these technology choices

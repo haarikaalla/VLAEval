@@ -39,7 +39,9 @@ class TrainingConfig:
     weight_decay: float = 1e-4
     warmup_steps: int = 100
     grad_clip_norm: float = 1.0
-    num_workers: int = 2
+    # Zero is the portable default for notebooks, macOS and restricted
+    # containers. Service deployments override this through Settings.
+    num_workers: int = 0
     seed: int = 42
     device: str = "cpu"
     checkpoint_dir: str = "./models/checkpoints"

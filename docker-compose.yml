@@ -9,6 +9,7 @@ x-app-env: &app-env
   HF_HOME: /data/hf_cache
   API_DEFAULT_API_KEY: ${API_DEFAULT_API_KEY:?API_DEFAULT_API_KEY must be set}
   API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:8080}
+  JOB_EXECUTION_MODE: worker
 
 services:
   postgres:

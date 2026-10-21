@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchEvaluationJobs, fetchModels, submitEvaluationJob } from "@/api/endpoints";
+import {
+  downloadEvaluationReport,
+  fetchEvaluationJobs,
+  fetchModels,
+  submitEvaluationJob,
+} from "@/api/endpoints";
 import type { EvaluationRequest } from "@/api/types";
 import { ErrorBanner, LoadingSpinner } from "@/components/Feedback";
 import { JobStatusBadge } from "@/components/JobStatusBadge";
@@ -10,6 +15,11 @@ const DEFAULT_FORM: EvaluationRequest = {
   dataset_name: "synthetic",
   device: "cpu",
   max_samples: 100,
+  evaluation_mode: "open_loop",
+  simulator: "synthetic-reach",
+  num_episodes: 20,
+  max_steps: 100,
+  action_dim: 7,
 };
 
 export function EvaluationPage() {
@@ -54,22 +64,64 @@ export function EvaluationPage() {
           </select>
         </label>
         <label className="text-sm">
+          Evaluation mode
+          <select
+            className="mt-1 w-full border border-slate-300 rounded-md px-2 py-1.5"
+            value={form.evaluation_mode}
+            onChange={(e) => setForm((f) => ({
+              ...f,
+              evaluation_mode: e.target.value as EvaluationRequest["evaluation_mode"],
+            }))}
+          >
+            <option value="open_loop">Open-loop dataset</option>
+            <option value="closed_loop">Closed-loop simulator</option>
+          </select>
+        </label>
+        <label className="text-sm">
           Dataset
           <input
+            disabled={form.evaluation_mode === "closed_loop"}
             className="mt-1 w-full border border-slate-300 rounded-md px-2 py-1.5"
             value={form.dataset_name}
             onChange={(e) => setForm((f) => ({ ...f, dataset_name: e.target.value }))}
           />
         </label>
         <label className="text-sm">
-          Max samples
+          {form.evaluation_mode === "closed_loop" ? "Episodes" : "Max samples"}
           <input
             type="number"
             className="mt-1 w-full border border-slate-300 rounded-md px-2 py-1.5"
-            value={form.max_samples ?? ""}
-            onChange={(e) => setForm((f) => ({ ...f, max_samples: Number(e.target.value) }))}
+            value={form.evaluation_mode === "closed_loop" ? form.num_episodes : (form.max_samples ?? "")}
+            onChange={(e) => setForm((f) => form.evaluation_mode === "closed_loop"
+              ? { ...f, num_episodes: Number(e.target.value) }
+              : { ...f, max_samples: Number(e.target.value) })}
           />
         </label>
+        {form.evaluation_mode === "closed_loop" && (
+          <>
+            <label className="text-sm">
+              Maximum steps
+              <input
+                type="number"
+                min="1"
+                className="mt-1 w-full border border-slate-300 rounded-md px-2 py-1.5"
+                value={form.max_steps}
+                onChange={(e) => setForm((f) => ({ ...f, max_steps: Number(e.target.value) }))}
+              />
+            </label>
+            <label className="text-sm">
+              Action dimensions
+              <input
+                type="number"
+                min="1"
+                max="64"
+                className="mt-1 w-full border border-slate-300 rounded-md px-2 py-1.5"
+                value={form.action_dim}
+                onChange={(e) => setForm((f) => ({ ...f, action_dim: Number(e.target.value) }))}
+              />
+            </label>
+          </>
+        )}
         <label className="text-sm">
           Device
           <select
@@ -90,11 +142,12 @@ export function EvaluationPage() {
           >
             {submitMutation.isPending ? "Submitting..." : "Submit evaluation job"}
           </button>
-          {submitMutation.isError && <ErrorBanner message="Failed to submit job. Check your API key." />}
+          {submitMutation.isError && <ErrorBanner message="Failed to submit job. Sign in and check the selected options." />}
         </div>
       </form>
 
       {jobsQuery.isLoading && <LoadingSpinner label="Loading jobs..." />}
+      {jobsQuery.isError && <ErrorBanner message="Sign in to view and submit evaluation jobs." />}
       {jobsQuery.data && (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <table className="min-w-full text-sm">
@@ -104,6 +157,7 @@ export function EvaluationPage() {
                 <th className="px-4 py-2 text-left">Status</th>
                 <th className="px-4 py-2 text-left">Score</th>
                 <th className="px-4 py-2 text-left">Created</th>
+                <th className="px-4 py-2 text-left">Report</th>
               </tr>
             </thead>
             <tbody>
@@ -119,6 +173,17 @@ export function EvaluationPage() {
                       : "-"}
                   </td>
                   <td className="px-4 py-2 text-slate-500">{new Date(job.created_at).toLocaleString()}</td>
+                  <td className="px-4 py-2">
+                    {job.status === "succeeded" ? (
+                      <button
+                        type="button"
+                        className="text-brand-700 hover:underline"
+                        onClick={() => void downloadEvaluationReport(job.id)}
+                      >
+                        Download
+                      </button>
+                    ) : "-"}
+                  </td>
                 </tr>
               ))}
             </tbody>

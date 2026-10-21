@@ -44,8 +44,8 @@ Manifests live under [`deploy/k8s/`](../deploy/k8s/):
 
 ```
 base/                     # namespace, configmap, deployments, statefulset, PVCs, ingress
-overlays/staging/         # staging patches (replicas, image tag, secrets)
-overlays/production/      # production patches (replicas, image tag, secrets)
+overlays/staging/         # staging patches (replicas, image tag, CPU worker)
+overlays/production/      # production patches (replicas and image tag)
 ```
 
 Deploy to staging:
@@ -62,7 +62,7 @@ kubectl apply -k deploy/k8s/overlays/production
 
 Before applying to a real cluster:
 
-1. **Secrets**: replace the placeholder values in `overlays/{staging,production}/secret.yaml` with real secrets — ideally via a secret manager (Sealed Secrets, External Secrets Operator, SOPS) rather than committing plaintext.
+1. **Secrets**: do not commit a live Secret manifest. The manual Deploy workflow creates `vla-eval-secrets` from protected GitHub Environment secrets. For direct cluster use, create that Secret from a secrets manager or use `base/secret.example.yaml` only as a key-name reference.
 2. **Images**: the overlays reference GHCR images tagged `latest`, built and pushed by the `cd.yml` GitHub Actions workflow as `ghcr.io/<owner>/<repo lowercased>-<component>`. Point `kustomization.yaml` `images:` entries at your own registry if not using GHCR.
 3. **Storage**: `base/pvc.yaml` requests `ReadWriteMany` PVCs (dataset cache, model checkpoints, MLflow artifacts) — ensure your cluster's default StorageClass supports RWX (e.g. NFS, EFS, Azure Files), or switch to `ReadWriteOnce` + per-pod storage if not needed across replicas.
 4. **GPU workers**: `base/deployment-worker.yaml` sets an `nvidia.com/gpu: "1"` resource limit for GPU-backed training; keep it only if your node pool has GPU nodes and the NVIDIA device plugin installed. The `staging` overlay already removes it (`patch-worker-cpu.yaml`) for CPU-only clusters.
@@ -76,7 +76,7 @@ GitHub Actions workflows (`.github/workflows/`):
 
 - **`ci.yml`** — lint + type-check, pytest matrix (3.10/3.11/3.12), security scan (bandit + pip-audit), frontend lint/test, Docker build validation. Runs on every push/PR.
 - **`cd.yml`** — builds and pushes `api`/`worker`/`frontend`/`mlflow` images to GHCR and scans them with Trivy. It does **not** deploy.
-- **`deploy.yml`** — manual (`workflow_dispatch`) rollout to `staging` or `production` via `kubectl` + Kustomize. It requires a `KUBE_CONFIG` secret; a preflight job checks for it before the environment-bound job starts, so a missing cluster fails fast without recording a failed deployment.
+- **`deploy.yml`** — manual (`workflow_dispatch`) rollout via `kubectl` + Kustomize. A repository-level `KUBE_CONFIG` preflight fails before opening an environment deployment; the selected GitHub Environment then supplies `APP_SECRET_KEY`, `API_DEFAULT_API_KEY`, `POSTGRES_PASSWORD`, `DATABASE_URL` and `MLFLOW_BACKEND_STORE_URI`. The workflow injects them, waits for every deployment and runs an in-cluster readiness smoke test.
 - **`security.yml`** — CodeQL (Python + JS/TS), Dependabot dependency review on PRs, secret scanning via gitleaks.
 - **`nightly-benchmark.yml`** — scheduled run of the offline benchmark suite against the baseline model, uploading the generated report as a workflow artifact.
 

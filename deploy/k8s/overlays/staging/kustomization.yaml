@@ -3,7 +3,6 @@ kind: Kustomization
 namespace: vla-eval
 resources:
   - ../../base
-  - secret.yaml
 namePrefix: ""
 patches:
   - path: patch-replicas.yaml

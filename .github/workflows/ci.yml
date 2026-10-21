@@ -166,6 +166,10 @@ jobs:
         run: |
           kubectl kustomize "deploy/k8s/overlays/${{ matrix.overlay }}" > rendered.yaml
           test -s rendered.yaml
+          if grep -q "REPLACE_ME" rendered.yaml; then
+            echo "::error::Placeholder secret found in rendered manifests."
+            exit 1
+          fi
 
       - name: Verify images match the tags CD publishes
         run: |

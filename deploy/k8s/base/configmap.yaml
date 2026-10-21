@@ -13,3 +13,4 @@ data:
   REDIS_URL: "redis://vla-eval-redis:6379/0"
   HF_HOME: "/data/hf_cache"
   TRAINING_DEVICE: "cuda"
+  JOB_EXECUTION_MODE: "worker"

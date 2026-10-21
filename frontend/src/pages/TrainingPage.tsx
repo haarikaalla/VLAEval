@@ -111,11 +111,12 @@ export function TrainingPage() {
           >
             {submitMutation.isPending ? "Submitting..." : "Submit training job"}
           </button>
-          {submitMutation.isError && <ErrorBanner message="Failed to submit job. Check your API key." />}
+          {submitMutation.isError && <ErrorBanner message="Failed to submit job. Sign in and check the selected options." />}
         </div>
       </form>
 
       {jobsQuery.isLoading && <LoadingSpinner label="Loading jobs..." />}
+      {jobsQuery.isError && <ErrorBanner message="Sign in to view and submit training jobs." />}
       {jobsQuery.data && (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <table className="min-w-full text-sm">

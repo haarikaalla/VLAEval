@@ -45,6 +45,8 @@ spec:
               mountPath: /app/data
             - name: models
               mountPath: /app/models
+            - name: reports
+              mountPath: /app/reports
       volumes:
         - name: data
           persistentVolumeClaim:
@@ -52,6 +54,9 @@ spec:
         - name: models
           persistentVolumeClaim:
             claimName: vla-eval-model-checkpoints
+        - name: reports
+          persistentVolumeClaim:
+            claimName: vla-eval-report-artifacts
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

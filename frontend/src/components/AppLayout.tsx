@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import clsx from "clsx";
+import { AuthPanel } from "@/components/AuthPanel";
 
 const navItems = [
   { to: "/", label: "Leaderboard", end: true },
@@ -12,9 +13,9 @@ export function AppLayout() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-brand-700 text-white shadow">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex flex-wrap items-center gap-4">
           <h1 className="text-xl font-semibold tracking-tight">VLA-Eval</h1>
-          <nav className="flex gap-4">
+          <nav className="flex flex-1 flex-wrap gap-2">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -31,6 +32,7 @@ export function AppLayout() {
               </NavLink>
             ))}
           </nav>
+          <AuthPanel />
         </div>
       </header>
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8">

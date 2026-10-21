@@ -23,6 +23,17 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
+  name: vla-eval-report-artifacts
+  namespace: vla-eval
+spec:
+  accessModes: ["ReadWriteMany"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
   name: vla-eval-mlflow-artifacts
   namespace: vla-eval
 spec:

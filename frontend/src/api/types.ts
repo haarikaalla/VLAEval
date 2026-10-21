@@ -44,6 +44,24 @@ export interface EvaluationRequest {
   checkpoint_path?: string | null;
   device: "cpu" | "cuda" | "mps";
   max_samples?: number | null;
+  evaluation_mode: "open_loop" | "closed_loop";
+  simulator: "synthetic-reach";
+  num_episodes: number;
+  max_steps: number;
+  action_dim: number;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: "bearer";
+  expires_in_minutes: number;
+  role: string;
+}
+
+export interface AuthUser {
+  subject: string;
+  role: string;
+  auth_type: string;
 }
 
 export interface LeaderboardEntry {

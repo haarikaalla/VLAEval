@@ -10,8 +10,8 @@ The FastAPI backend serves all endpoints under the `/api/v1` prefix. Interactive
 
 Two mechanisms are supported:
 
-1. **API key** (primary) — send `X-API-Key: <key>` on every request. The key is compared using `hmac.compare_digest` to avoid timing attacks. Configure via `API_DEFAULT_API_KEY` (see `.env.example`).
-2. **JWT** (optional, for delegated/short-lived access) — exchange your API key for a bearer token:
+1. **API key** (service access) — send `X-API-Key: <key>`. The key is compared using `hmac.compare_digest` to avoid timing attacks. Configure via `API_DEFAULT_API_KEY` (see `.env.example`).
+2. **JWT** (dashboard/short-lived access) — exchange your API key once for a bearer token:
 
    ```bash
    curl -X POST -H "X-API-Key: $API_KEY" http://localhost:8000/api/v1/auth/token
@@ -20,7 +20,7 @@ Two mechanisms are supported:
 
    Then send `Authorization: Bearer <token>` on subsequent requests.
 
-Unauthenticated endpoints: `GET /healthz`, `GET /readyz`, `GET /metrics` (Prometheus).
+Unauthenticated endpoints include health/readiness/metrics plus the public dataset, model and leaderboard discovery reads. Dataset downloads and all training/evaluation job operations require either authentication mechanism.
 
 ## Endpoints
 
@@ -56,8 +56,9 @@ Unauthenticated endpoints: `GET /healthz`, `GET /readyz`, `GET /metrics` (Promet
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/jobs` | Submit an evaluation/benchmark job. |
+| POST | `/jobs` | Submit an open-loop dataset benchmark or `synthetic-reach` closed-loop benchmark. |
 | GET | `/jobs/{job_id}` | Poll job status/result (includes composite score, metrics, report path once complete). |
+| GET | `/jobs/{job_id}/report` | Download the completed Markdown report. |
 
 ### Leaderboard (`/api/v1/leaderboard`)
 
@@ -70,6 +71,7 @@ Unauthenticated endpoints: `GET /healthz`, `GET /readyz`, `GET /metrics` (Promet
 | Method | Path | Description |
 |---|---|---|
 | POST | `/token` | Exchange a valid API key for a short-lived JWT. |
+| GET | `/me` | Return the current subject, role and authentication type. |
 
 ## Error format
 
@@ -87,4 +89,4 @@ Status code mapping: `DatasetNotFoundError` / `ModelNotFoundError` / `JobNotFoun
 ## Observability
 
 - **Structured logs**: every request gets a `request_id` and timing recorded via middleware (`vla_eval.api.main`), rendered as JSON in staging/production and console-formatted in development.
-- **Metrics**: Prometheus metrics exposed at `/metrics` via `prometheus-fastapi-instrumentator` (request counts, latency histograms). Scraped by the bundled Prometheus service in Docker Compose / Kubernetes and visualized in the pre-provisioned Grafana dashboard.
+- **Metrics**: Prometheus metrics exposed at `/metrics` via `prometheus-fastapi-instrumentator` (request counts, latency histograms). Docker Compose bundles Prometheus and a pre-provisioned Grafana dashboard; Kubernetes operators can connect their cluster monitoring stack to the same endpoint.

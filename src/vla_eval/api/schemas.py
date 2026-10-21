@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -75,6 +75,11 @@ class EvaluationRequest(BaseModel):
     checkpoint_path: str | None = None
     device: str = Field(default="cpu", pattern="^(cpu|cuda|mps)$")
     max_samples: int | None = Field(default=None, ge=1)
+    evaluation_mode: Literal["open_loop", "closed_loop"] = "open_loop"
+    simulator: Literal["synthetic-reach"] = "synthetic-reach"
+    num_episodes: int = Field(default=20, ge=1, le=1000)
+    max_steps: int = Field(default=100, ge=1, le=5000)
+    action_dim: int = Field(default=7, ge=1, le=64)
 
 
 class BenchmarkResultResponse(BaseModel):

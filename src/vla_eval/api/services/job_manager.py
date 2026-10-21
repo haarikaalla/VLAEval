@@ -2,7 +2,7 @@
 
 Jobs are persisted in the database (`Job` rows) so their status survives
 API process restarts and can be observed by any number of worker processes.
-Two execution modes are supported simultaneously:
+Two explicit execution modes are supported:
 
 1. **In-process** (default, good for local dev / small deployments): the API
    process itself submits jobs to a bounded `ThreadPoolExecutor`.
@@ -11,8 +11,8 @@ Two execution modes are supported simultaneously:
    executes them, allowing training/evaluation load to be scaled
    independently from the API tier.
 
-Both paths call the same `_execute_training_job` / `_execute_evaluation_job`
-functions, ensuring identical behavior regardless of where a job runs.
+Only one mode owns a deployment's pending jobs, preventing the API and worker
+from racing each other. Both paths call the same execution functions.
 """
 
 from __future__ import annotations
@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 from vla_eval.api.db import new_session
 from vla_eval.api.models_db import Job, JobStatus, JobType, LeaderboardEntryDB
 from vla_eval.api.schemas import EvaluationRequest, TrainingRequest
+from vla_eval.core.config import get_settings
 from vla_eval.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -44,23 +45,30 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def create_job(db: Session, job_type: JobType, payload: dict) -> Job:
-    job = Job(job_type=job_type, status=JobStatus.PENDING, payload=json.dumps(payload))
+def create_job(db: Session, job_type: JobType, payload: dict, *, created_by: str) -> Job:
+    job = Job(
+        job_type=job_type,
+        status=JobStatus.PENDING,
+        payload=json.dumps(payload),
+        created_by=created_by,
+    )
     db.add(job)
     db.commit()
     db.refresh(job)
     return job
 
 
-def submit_training_job(db: Session, request: TrainingRequest) -> Job:
-    job = create_job(db, JobType.TRAINING, request.model_dump())
-    _executor.submit(_execute_training_job, job.id, request)
+def submit_training_job(db: Session, request: TrainingRequest, *, created_by: str) -> Job:
+    job = create_job(db, JobType.TRAINING, request.model_dump(), created_by=created_by)
+    if get_settings().job_execution_mode == "inline":
+        _executor.submit(_execute_training_job, job.id, request)
     return job
 
 
-def submit_evaluation_job(db: Session, request: EvaluationRequest) -> Job:
-    job = create_job(db, JobType.EVALUATION, request.model_dump())
-    _executor.submit(_execute_evaluation_job, job.id, request)
+def submit_evaluation_job(db: Session, request: EvaluationRequest, *, created_by: str) -> Job:
+    job = create_job(db, JobType.EVALUATION, request.model_dump(), created_by=created_by)
+    if get_settings().job_execution_mode == "inline":
+        _executor.submit(_execute_evaluation_job, job.id, request)
     return job
 
 
@@ -142,13 +150,15 @@ def _execute_training_job(job_id: str, request: TrainingRequest) -> None:
             else preprocess_dataset(request.dataset_name)
         )
         policy = create_model(request.model_name, device=device, action_dim=dataset.spec.action_dim)
+        settings = get_settings()
         config = TrainingConfig(
             run_name=request.run_name or f"job-{job_id[:8]}",
             num_epochs=request.num_epochs,
             batch_size=request.batch_size,
             learning_rate=request.learning_rate,
             device=device,
-            checkpoint_dir=f"{get_settings().checkpoint_root}/{job_id}",
+            num_workers=settings.training_num_workers,
+            checkpoint_dir=f"{settings.checkpoint_root}/{job_id}",
         )
         callbacks: list[Callback] = [
             EarlyStopping(monitor="val_loss", patience=config.early_stopping_patience),
@@ -177,22 +187,49 @@ def _execute_evaluation_job(job_id: str, request: EvaluationRequest) -> None:
 
         from vla_eval.core.config import get_settings
         from vla_eval.data.preprocessing import make_synthetic_dataset, preprocess_dataset
-        from vla_eval.evaluation.benchmark import run_offline_benchmark
+        from vla_eval.evaluation.benchmark import (
+            run_closed_loop_benchmark,
+            run_offline_benchmark,
+        )
         from vla_eval.evaluation.report import generate_markdown_report
+        from vla_eval.evaluation.synthetic_reach import SyntheticReachEnv
         from vla_eval.models.registry import create_model
         from vla_eval.utils.device import resolve_device
 
         device = resolve_device(request.device)
-        dataset = (
-            make_synthetic_dataset()
-            if request.dataset_name == "synthetic"
-            else preprocess_dataset(request.dataset_name)
-        )
-        policy = create_model(request.model_name, device=device, action_dim=dataset.spec.action_dim)
+        dataset = None
+        if request.evaluation_mode == "open_loop":
+            dataset = (
+                make_synthetic_dataset()
+                if request.dataset_name == "synthetic"
+                else preprocess_dataset(request.dataset_name)
+            )
+            action_dim = dataset.spec.action_dim
+        else:
+            action_dim = request.action_dim
+
+        model_kwargs = {"device": device, "action_dim": action_dim}
+        if request.model_name == "baseline-cnn":
+            model_kwargs["state_dim"] = action_dim
+        policy = create_model(request.model_name, **model_kwargs)
         if request.checkpoint_path:
             policy.load(request.checkpoint_path)
 
-        result = run_offline_benchmark(policy, dataset, max_samples=request.max_samples)
+        if request.evaluation_mode == "closed_loop":
+            env = SyntheticReachEnv(
+                action_dim=action_dim,
+                max_steps=request.max_steps,
+            )
+            result = run_closed_loop_benchmark(
+                policy,
+                env,
+                num_episodes=request.num_episodes,
+                max_steps=request.max_steps,
+            )
+        else:
+            if dataset is None:  # pragma: no cover - guarded by evaluation_mode
+                raise RuntimeError("Open-loop evaluation requires a dataset")
+            result = run_offline_benchmark(policy, dataset, max_samples=request.max_samples)
         report_path = generate_markdown_report(result, f"{get_settings().report_root}/{job_id}")
 
         entry = LeaderboardEntryDB(
@@ -209,9 +246,11 @@ def _execute_evaluation_job(job_id: str, request: EvaluationRequest) -> None:
         db.commit()
 
         result_dict = {
+            "evaluation_mode": request.evaluation_mode,
             "composite_score": result.composite_score,
             "action_mse": result.action_metrics.mse,
             "latency_p95_ms": result.latency.p95_ms,
+            "success_rate": result.success_rate,
             "report_path": str(report_path),
         }
         _mark_succeeded(db, job_id, result_dict)

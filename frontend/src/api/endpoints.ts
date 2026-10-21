@@ -5,8 +5,24 @@ import type {
   JobResponse,
   LeaderboardEntry,
   ModelInfo,
+  AuthUser,
+  TokenResponse,
   TrainingRequest,
 } from "@/api/types";
+
+export async function exchangeApiKey(apiKey: string): Promise<TokenResponse> {
+  const { data } = await apiClient.post<TokenResponse>(
+    "/auth/token",
+    undefined,
+    { headers: { "X-API-Key": apiKey } },
+  );
+  return data;
+}
+
+export async function fetchCurrentUser(): Promise<AuthUser> {
+  const { data } = await apiClient.get<AuthUser>("/auth/me");
+  return data;
+}
 
 export async function fetchDatasets(): Promise<DatasetInfo[]> {
   const { data } = await apiClient.get<DatasetInfo[]>("/datasets");
@@ -48,6 +64,18 @@ export async function submitEvaluationJob(request: EvaluationRequest): Promise<J
 export async function fetchEvaluationJobs(): Promise<JobResponse[]> {
   const { data } = await apiClient.get<JobResponse[]>("/evaluation/jobs");
   return data;
+}
+
+export async function downloadEvaluationReport(jobId: string): Promise<void> {
+  const { data } = await apiClient.get<Blob>(`/evaluation/jobs/${jobId}/report`, {
+    responseType: "blob",
+  });
+  const url = URL.createObjectURL(data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `vla-eval-${jobId.slice(0, 8)}-report.md`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 export async function triggerDatasetDownload(name: string): Promise<{ message: string }> {

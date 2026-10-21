@@ -39,7 +39,11 @@ def _handle_shutdown(signum: int, frame: FrameType | None) -> None:
 
 def run_worker_loop() -> None:
     configure_logging()
-    get_settings()
+    settings = get_settings()
+    if settings.job_execution_mode != "worker":
+        raise RuntimeError(
+            "Standalone worker requires JOB_EXECUTION_MODE=worker; refusing ambiguous ownership."
+        )
     init_db()
 
     signal.signal(signal.SIGTERM, _handle_shutdown)

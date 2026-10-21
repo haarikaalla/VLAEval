@@ -10,10 +10,12 @@ from fastapi.testclient import TestClient
 from vla_eval.api.main import app
 
 
-def _wait_for_job(client: TestClient, path: str, timeout_s: float = 60.0) -> dict:
+def _wait_for_job(
+    client: TestClient, path: str, headers: dict[str, str], timeout_s: float = 60.0
+) -> dict:
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
-        response = client.get(path)
+        response = client.get(path, headers=headers)
         assert response.status_code == 200
         body = response.json()
         if body["status"] in ("succeeded", "failed"):
@@ -46,7 +48,9 @@ def test_training_and_evaluation_end_to_end(api_key: str) -> None:
         train_job = train_response.json()
         assert train_job["status"] in ("pending", "running")
 
-        finished_train_job = _wait_for_job(client, f"/api/v1/training/jobs/{train_job['id']}")
+        finished_train_job = _wait_for_job(
+            client, f"/api/v1/training/jobs/{train_job['id']}", headers
+        )
         assert finished_train_job["status"] == "succeeded", finished_train_job.get("error_message")
 
         eval_response = client.post(
@@ -62,7 +66,9 @@ def test_training_and_evaluation_end_to_end(api_key: str) -> None:
         assert eval_response.status_code == 202
         eval_job = eval_response.json()
 
-        finished_eval_job = _wait_for_job(client, f"/api/v1/evaluation/jobs/{eval_job['id']}")
+        finished_eval_job = _wait_for_job(
+            client, f"/api/v1/evaluation/jobs/{eval_job['id']}", headers
+        )
         assert finished_eval_job["status"] == "succeeded", finished_eval_job.get("error_message")
         assert "composite_score" in finished_eval_job["result"]
 
@@ -74,6 +80,39 @@ def test_training_and_evaluation_end_to_end(api_key: str) -> None:
 
 def test_list_training_jobs(api_key: str) -> None:
     with TestClient(app) as client:
-        response = client.get("/api/v1/training/jobs")
+        response = client.get("/api/v1/training/jobs", headers={"X-API-Key": api_key})
     assert response.status_code == 200
     assert isinstance(response.json(), list)
+
+
+def test_job_metadata_requires_authentication() -> None:
+    with TestClient(app) as client:
+        response = client.get("/api/v1/training/jobs")
+    assert response.status_code == 401
+
+
+def test_jwt_can_submit_and_read_jobs(api_key: str) -> None:
+    with TestClient(app) as client:
+        token_response = client.post("/api/v1/auth/token", headers={"X-API-Key": api_key})
+        token = token_response.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        response = client.post(
+            "/api/v1/evaluation/jobs",
+            headers=headers,
+            json={
+                "model_name": "baseline-cnn",
+                "evaluation_mode": "closed_loop",
+                "num_episodes": 1,
+                "max_steps": 2,
+                "action_dim": 7,
+            },
+        )
+        assert response.status_code == 202
+        job = response.json()
+        finished = _wait_for_job(client, f"/api/v1/evaluation/jobs/{job['id']}", headers)
+        report_response = client.get(f"/api/v1/evaluation/jobs/{job['id']}/report", headers=headers)
+    assert finished["status"] == "succeeded", finished.get("error_message")
+    assert finished["result"]["evaluation_mode"] == "closed_loop"
+    assert "success_rate" in finished["result"]
+    assert report_response.status_code == 200
+    assert "VLA-Eval Benchmark Report" in report_response.text

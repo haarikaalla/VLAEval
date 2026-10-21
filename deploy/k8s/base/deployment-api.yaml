@@ -70,7 +70,8 @@ spec:
           persistentVolumeClaim:
             claimName: vla-eval-model-checkpoints
         - name: reports
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: vla-eval-report-artifacts
 ---
 apiVersion: v1
 kind: Service

@@ -22,6 +22,8 @@ def _test_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterat
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
     monkeypatch.setenv("API_DEFAULT_API_KEY", "test-api-key")
     monkeypatch.setenv("APP_SECRET_KEY", "test-secret-key-not-for-production")
+    monkeypatch.setenv("JOB_EXECUTION_MODE", "inline")
+    monkeypatch.setenv("TRAINING_NUM_WORKERS", "0")
     monkeypatch.setenv("MLFLOW_TRACKING_URI", f"sqlite:///{tmp_path / 'mlflow.db'}")
     # Keep job artifacts inside the test's tmp dir instead of the repo root.
     monkeypatch.setenv("CHECKPOINT_ROOT", str(tmp_path / "checkpoints"))

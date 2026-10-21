@@ -45,7 +45,16 @@ def test_auth_token_requires_valid_api_key() -> None:
 def test_auth_token_issued_with_valid_api_key(api_key: str) -> None:
     with TestClient(app) as client:
         response = client.post("/api/v1/auth/token", headers={"X-API-Key": api_key})
+        token = response.json()["access_token"]
+        me_response = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     body = response.json()
     assert body["token_type"] == "bearer"
     assert body["access_token"]
+    assert body["role"] == "operator"
+    assert me_response.status_code == 200
+    assert me_response.json() == {
+        "subject": "api-client",
+        "role": "operator",
+        "auth_type": "bearer",
+    }

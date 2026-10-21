@@ -8,13 +8,13 @@ export const apiClient = axios.create({
   timeout: 15000,
 });
 
-// Attach the API key (dev/local use only -- browsers should prefer the
-// short-lived JWT flow via /auth/token for anything user-facing).
+// Browser requests use a short-lived token. The long-lived API key is only
+// sent once by exchangeApiKey and is never persisted in localStorage.
 apiClient.interceptors.request.use((config) => {
-  const apiKey = localStorage.getItem("vla_eval_api_key");
-  if (apiKey) {
+  const token = localStorage.getItem("vla_eval_access_token");
+  if (token) {
     config.headers = config.headers ?? {};
-    config.headers["X-API-Key"] = apiKey;
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });

@@ -44,7 +44,7 @@ jobs:
           INPUT_TAG: ${{ inputs.image_tag }}
         run: |
           if [ -z "$KUBE_CONFIG" ]; then
-            echo "::error::KUBE_CONFIG secret is not set - configure a cluster before deploying."
+            echo "::error::KUBE_CONFIG repository secret is not set."
             exit 1
           fi
 
@@ -59,6 +59,21 @@ jobs:
     environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validate environment secrets
+        env:
+          APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
+          API_DEFAULT_API_KEY: ${{ secrets.API_DEFAULT_API_KEY }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MLFLOW_BACKEND_STORE_URI: ${{ secrets.MLFLOW_BACKEND_STORE_URI }}
+        run: |
+          for secret_name in APP_SECRET_KEY API_DEFAULT_API_KEY POSTGRES_PASSWORD DATABASE_URL MLFLOW_BACKEND_STORE_URI; do
+            if [ -z "${!secret_name}" ]; then
+              echo "::error::${secret_name} environment secret is not set."
+              exit 1
+            fi
+          done
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
@@ -75,7 +90,24 @@ jobs:
           kubectl cluster-info
 
       - name: Apply Kubernetes manifests
+        env:
+          APP_SECRET_KEY: ${{ secrets.APP_SECRET_KEY }}
+          API_DEFAULT_API_KEY: ${{ secrets.API_DEFAULT_API_KEY }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MLFLOW_BACKEND_STORE_URI: ${{ secrets.MLFLOW_BACKEND_STORE_URI }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
+          kubectl apply -f deploy/k8s/base/namespace.yaml
+          kubectl create secret generic vla-eval-secrets \
+            --namespace vla-eval \
+            --from-literal=APP_SECRET_KEY="$APP_SECRET_KEY" \
+            --from-literal=API_DEFAULT_API_KEY="$API_DEFAULT_API_KEY" \
+            --from-literal=POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+            --from-literal=DATABASE_URL="$DATABASE_URL" \
+            --from-literal=MLFLOW_BACKEND_STORE_URI="$MLFLOW_BACKEND_STORE_URI" \
+            --from-literal=HF_TOKEN="${HF_TOKEN:-}" \
+            --dry-run=client -o yaml | kubectl apply -f -
           kubectl apply -k "deploy/k8s/overlays/${{ inputs.environment }}"
 
       - name: Roll out built image tags
@@ -95,3 +127,11 @@ jobs:
             kubectl rollout status "deployment/vla-eval-${component}" \
               -n vla-eval --timeout=300s
           done
+
+      - name: Smoke test the deployed API
+        run: |
+          kubectl run "vla-eval-smoke-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --namespace vla-eval \
+            --image=curlimages/curl:8.10.1 \
+            --restart=Never --rm --attach \
+            -- -fsS --retry 5 --retry-delay 3 http://vla-eval-api:8000/readyz

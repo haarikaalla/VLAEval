@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     api_key_header_name: str = "X-API-Key"
     api_default_api_key: str = "dev-local-api-key-change-me"
 
+    # --- Job execution ---
+    # Local development can execute jobs in the API process. Container and
+    # Kubernetes deployments use a dedicated, horizontally scalable worker.
+    job_execution_mode: Literal["inline", "worker"] = "inline"
+
     # --- Database ---
     database_url: str = "sqlite:///./vla_eval.db"
 
@@ -87,15 +92,21 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.app_env == "production"
 
+    @property
+    def is_deployed(self) -> bool:
+        return self.app_env in {"staging", "production"}
+
 
 @lru_cache
 def get_settings() -> Settings:
     """Return a cached, process-wide `Settings` instance."""
     settings = Settings()
-    if (
-        settings.is_production
-        and settings.app_secret_key
-        == "dev-insecure-secret-change-me"  # nosec B105 - dev-only placeholder, enforced below
-    ):
-        raise RuntimeError("APP_SECRET_KEY must be set to a secure random value in production.")
+    if settings.is_deployed:
+        if (
+            settings.app_secret_key
+            == "dev-insecure-secret-change-me"  # nosec B105 - enforced below
+        ):
+            raise RuntimeError("APP_SECRET_KEY must be set in staging and production.")
+        if settings.api_default_api_key == "dev-local-api-key-change-me":  # nosec B105
+            raise RuntimeError("API_DEFAULT_API_KEY must be set in staging and production.")
     return settings

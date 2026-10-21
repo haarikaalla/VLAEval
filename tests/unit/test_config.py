@@ -23,3 +23,15 @@ def test_cors_origins_list_parses_csv(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_settings_are_cached() -> None:
     assert get_settings() is get_settings()
+
+
+def test_deployed_environment_rejects_default_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APP_ENV", "staging")
+    monkeypatch.setenv("APP_SECRET_KEY", "secure-test-secret")
+    monkeypatch.setenv("API_DEFAULT_API_KEY", "dev-local-api-key-change-me")
+    get_settings.cache_clear()
+    with pytest.raises(RuntimeError, match="API_DEFAULT_API_KEY"):
+        get_settings()
+    get_settings.cache_clear()

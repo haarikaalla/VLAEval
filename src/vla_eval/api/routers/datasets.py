@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, status
 
-from vla_eval.api.dependencies import ApiKeyAuth
+from vla_eval.api.dependencies import WriteAuth
 from vla_eval.api.schemas import DatasetDownloadRequest, DatasetInfo
 from vla_eval.core.exceptions import DatasetDownloadError
 from vla_eval.core.logging import get_logger
@@ -55,7 +55,7 @@ def get_dataset(name: str) -> DatasetInfo:
     summary="Trigger an asynchronous dataset download",
 )
 def download_dataset(
-    request: DatasetDownloadRequest, background_tasks: BackgroundTasks, api_key: ApiKeyAuth
+    request: DatasetDownloadRequest, background_tasks: BackgroundTasks, principal: WriteAuth
 ) -> dict:
     from vla_eval.core.config import get_settings
     from vla_eval.data.datasets import download_dataset as _download

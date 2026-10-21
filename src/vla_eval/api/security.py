@@ -12,6 +12,7 @@ Two complementary mechanisms are supported:
 from __future__ import annotations
 
 import hmac
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
@@ -27,6 +28,15 @@ logger = get_logger(__name__)
 
 _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 _bearer_scheme = HTTPBearer(auto_error=False)
+
+
+@dataclass(frozen=True)
+class AuthPrincipal:
+    """Authenticated caller propagated to protected route handlers."""
+
+    subject: str
+    role: str
+    auth_type: str
 
 
 def _constant_time_eq(a: str, b: str) -> bool:
@@ -53,21 +63,29 @@ def verify_api_key(
 
 
 def create_access_token(
-    subject: str, settings: Settings, expires_minutes: int | None = None
+    subject: str,
+    settings: Settings,
+    expires_minutes: int | None = None,
+    role: str = "operator",
 ) -> str:
     """Issue a signed JWT for `subject` (e.g. an API key id or username)."""
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=expires_minutes or settings.api_jwt_expire_minutes
     )
-    payload = {"sub": subject, "exp": expire, "iat": datetime.now(timezone.utc)}
+    payload = {
+        "sub": subject,
+        "role": role,
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+    }
     return jwt.encode(payload, settings.app_secret_key, algorithm=settings.api_jwt_algorithm)
 
 
 def verify_access_token(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)],
     settings: Annotated[Settings, Depends(get_settings)],
-) -> str:
-    """FastAPI dependency validating a `Bearer` JWT and returning its subject."""
+) -> AuthPrincipal:
+    """FastAPI dependency validating a `Bearer` JWT."""
     if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token."
@@ -78,9 +96,32 @@ def verify_access_token(
             settings.app_secret_key,
             algorithms=[settings.api_jwt_algorithm],
         )
-        subject: str = payload["sub"]
-        return subject
-    except InvalidTokenError as exc:
+        subject = payload["sub"]
+        role = payload.get("role", "operator")
+        if not isinstance(subject, str) or not subject:
+            raise InvalidTokenError("Token subject must be a non-empty string.")
+        if role not in {"operator", "service"}:
+            raise InvalidTokenError("Token role is not recognized.")
+        return AuthPrincipal(subject=subject, role=role, auth_type="bearer")
+    except (InvalidTokenError, KeyError, TypeError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token."
         ) from exc
+
+
+def authenticate_write(
+    api_key: Annotated[str | None, Depends(_api_key_header)],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> AuthPrincipal:
+    """Accept either a service API key or a short-lived dashboard JWT."""
+    if api_key and _constant_time_eq(api_key, settings.api_default_api_key):
+        return AuthPrincipal(subject="service-client", role="service", auth_type="api_key")
+    if credentials is not None:
+        return verify_access_token(credentials, settings)
+    logger.warning("protected_route_auth_failed")
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Valid API key or bearer token required.",
+        headers={"WWW-Authenticate": "Bearer, ApiKey"},
+    )
