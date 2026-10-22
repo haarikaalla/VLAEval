@@ -4,7 +4,7 @@
 # Build with: docker build -f docker/training/Dockerfile -t vla-eval-training .
 # Run with:   docker run --gpus all vla-eval-training vla-eval train --model openvla --dataset pusht
 
-FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04 AS runtime
+FROM nvidia/cuda:12.2.2-cudnn8-runtime-ubuntu22.04 AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
