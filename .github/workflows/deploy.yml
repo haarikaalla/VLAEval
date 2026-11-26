@@ -58,7 +58,7 @@ jobs:
     needs: [preflight]
     environment: ${{ inputs.environment }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Validate environment secrets
         env:
@@ -76,7 +76,7 @@ jobs:
           done
 
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
+        uses: azure/setup-kubectl@v5
         with:
           version: "v1.30.0"
 
